@@ -149,10 +149,10 @@ thread_info_destroy(void *node)
 {
     ThreadInfoNode *info_node = (ThreadInfoNode *)node;
 
-    os_mutex_lock(&thread_global_lock);
+    os_thread_mutex_lock(&thread_global_lock);
     if (info_node->type == T_MUTEX) {
         if (info_node->status != MUTEX_DESTROYED)
-            os_mutex_destroy(info_node->u.mutex);
+            os_thread_mutex_destroy(info_node->u.mutex);
         wasm_runtime_free(info_node->u.mutex);
     }
     else if (info_node->type == T_COND) {
@@ -161,17 +161,17 @@ thread_info_destroy(void *node)
         wasm_runtime_free(info_node->u.cond);
     }
     wasm_runtime_free(info_node);
-    os_mutex_unlock(&thread_global_lock);
+    os_thread_mutex_unlock(&thread_global_lock);
 }
 
 bool
 lib_pthread_init()
 {
-    if (0 != os_mutex_init(&thread_global_lock))
+    if (0 != os_thread_mutex_init(&thread_global_lock))
         return false;
     bh_list_init(&cluster_info_list);
     if (!wasm_cluster_register_destroy_callback(lib_pthread_destroy_callback)) {
-        os_mutex_destroy(&thread_global_lock);
+        os_thread_mutex_destroy(&thread_global_lock);
         return false;
     }
     return true;
@@ -180,7 +180,7 @@ lib_pthread_init()
 void
 lib_pthread_destroy()
 {
-    os_mutex_destroy(&thread_global_lock);
+    os_thread_mutex_destroy(&thread_global_lock);
 }
 
 static ClusterInfoNode *
@@ -188,17 +188,17 @@ get_cluster_info(WASMCluster *cluster)
 {
     ClusterInfoNode *node;
 
-    os_mutex_lock(&thread_global_lock);
+    os_thread_mutex_lock(&thread_global_lock);
     node = bh_list_first_elem(&cluster_info_list);
 
     while (node) {
         if (cluster == node->cluster) {
-            os_mutex_unlock(&thread_global_lock);
+            os_thread_mutex_unlock(&thread_global_lock);
             return node;
         }
         node = bh_list_elem_next(node);
     }
-    os_mutex_unlock(&thread_global_lock);
+    os_thread_mutex_unlock(&thread_global_lock);
 
     return NULL;
 }
@@ -288,13 +288,13 @@ call_key_destructor(wasm_exec_env_t exec_env)
     for (i = 0; i < WAMR_PTHREAD_KEYS_MAX; i++) {
         if (value_node->thread_key_values[i] != 0) {
             int32 value = value_node->thread_key_values[i];
-            os_mutex_lock(&info->key_data_list_lock);
+            os_thread_mutex_lock(&info->key_data_list_lock);
 
             if ((key_node = key_data_list_lookup(exec_env, i)))
                 destructor_index = key_node->destructor_func;
             else
                 destructor_index = 0;
-            os_mutex_unlock(&info->key_data_list_lock);
+            os_thread_mutex_unlock(&info->key_data_list_lock);
 
             /* reset key value */
             value_node->thread_key_values[i] = 0;
@@ -346,7 +346,7 @@ create_cluster_info(WASMCluster *cluster)
     ret = bh_list_init(node->thread_list);
     bh_assert(ret == BH_LIST_SUCCESS);
 
-    if (os_mutex_init(&node->key_data_list_lock) != 0) {
+    if (os_thread_mutex_init(&node->key_data_list_lock) != 0) {
         wasm_runtime_free(node);
         return NULL;
     }
@@ -355,14 +355,14 @@ create_cluster_info(WASMCluster *cluster)
     if (!(node->thread_info_map = bh_hash_map_create(
               32, true, (HashFunc)thread_handle_hash,
               (KeyEqualFunc)thread_handle_equal, NULL, thread_info_destroy))) {
-        os_mutex_destroy(&node->key_data_list_lock);
+        os_thread_mutex_destroy(&node->key_data_list_lock);
         wasm_runtime_free(node);
         return NULL;
     }
-    os_mutex_lock(&thread_global_lock);
+    os_thread_mutex_lock(&thread_global_lock);
     ret = bh_list_insert(&cluster_info_list, node);
     bh_assert(ret == BH_LIST_SUCCESS);
-    os_mutex_unlock(&thread_global_lock);
+    os_thread_mutex_unlock(&thread_global_lock);
 
     (void)ret;
     return node;
@@ -375,13 +375,13 @@ destroy_cluster_info(WASMCluster *cluster)
     if (node) {
         bh_hash_map_destroy(node->thread_info_map);
         destroy_thread_key_value_list(node->thread_list);
-        os_mutex_destroy(&node->key_data_list_lock);
+        os_thread_mutex_destroy(&node->key_data_list_lock);
 
         /* Remove from the cluster info list */
-        os_mutex_lock(&thread_global_lock);
+        os_thread_mutex_lock(&thread_global_lock);
         bh_list_remove(&cluster_info_list, node);
         wasm_runtime_free(node);
-        os_mutex_unlock(&thread_global_lock);
+        os_thread_mutex_unlock(&thread_global_lock);
         return true;
     }
     return false;
@@ -448,9 +448,9 @@ static uint32
 allocate_handle()
 {
     uint32 id;
-    os_mutex_lock(&thread_global_lock);
+    os_thread_mutex_lock(&thread_global_lock);
     id = handle_id++;
-    os_mutex_unlock(&thread_global_lock);
+    os_thread_mutex_unlock(&thread_global_lock);
     return id;
 }
 
@@ -465,20 +465,20 @@ pthread_start_routine(void *arg)
     uint32 argv[1];
 
     parent_exec_env = info_node->parent_exec_env;
-    os_mutex_lock(&parent_exec_env->wait_lock);
+    os_thread_mutex_lock(&parent_exec_env->wait_lock);
     info_node->exec_env = exec_env;
     info_node->u.thread = exec_env->handle;
     if (!append_thread_info_node(info_node)) {
         wasm_runtime_deinstantiate_internal(module_inst, true);
         delete_thread_info_node(info_node);
         os_cond_signal(&parent_exec_env->wait_cond);
-        os_mutex_unlock(&parent_exec_env->wait_lock);
+        os_thread_mutex_unlock(&parent_exec_env->wait_lock);
         return NULL;
     }
 
     info_node->status = THREAD_RUNNING;
     os_cond_signal(&parent_exec_env->wait_cond);
-    os_mutex_unlock(&parent_exec_env->wait_lock);
+    os_thread_mutex_unlock(&parent_exec_env->wait_lock);
 
     wasm_exec_env_set_thread_info(exec_env);
     argv[0] = routine_args->arg;
@@ -587,11 +587,11 @@ pthread_create_wrapper(wasm_exec_env_t exec_env,
     routine_args->info_node = info_node;
     routine_args->module_inst = new_module_inst;
 
-    os_mutex_lock(&exec_env->wait_lock);
+    os_thread_mutex_lock(&exec_env->wait_lock);
     ret = wasm_cluster_create_thread(
         exec_env, new_module_inst, pthread_start_routine, (void *)routine_args);
     if (ret != 0) {
-        os_mutex_unlock(&exec_env->wait_lock);
+        os_thread_mutex_unlock(&exec_env->wait_lock);
         goto fail;
     }
 
@@ -599,7 +599,7 @@ pthread_create_wrapper(wasm_exec_env_t exec_env,
        thread_info_node, otherwise the exec_env in the thread
        info node may be NULL in the next pthread API call */
     os_cond_wait(&exec_env->wait_cond, &exec_env->wait_lock);
-    os_mutex_unlock(&exec_env->wait_lock);
+    os_thread_mutex_unlock(&exec_env->wait_lock);
 
     if (thread)
         *thread = thread_handle;
@@ -773,7 +773,7 @@ pthread_mutex_init_wrapper(wasm_exec_env_t exec_env, uint32 *mutex, void *attr)
         return -1;
     }
 
-    if (os_mutex_init(pmutex) != 0) {
+    if (os_thread_mutex_init(pmutex) != 0) {
         goto fail1;
     }
 
@@ -799,7 +799,7 @@ pthread_mutex_init_wrapper(wasm_exec_env_t exec_env, uint32 *mutex, void *attr)
 fail3:
     delete_thread_info_node(info_node);
 fail2:
-    os_mutex_destroy(pmutex);
+    os_thread_mutex_destroy(pmutex);
 fail1:
     wasm_runtime_free(pmutex);
 
@@ -813,7 +813,7 @@ pthread_mutex_lock_wrapper(wasm_exec_env_t exec_env, uint32 *mutex)
     if (!info_node || info_node->type != T_MUTEX)
         return -1;
 
-    return os_mutex_lock(info_node->u.mutex);
+    return os_thread_mutex_lock(info_node->u.mutex);
 }
 
 static int32
@@ -823,7 +823,7 @@ pthread_mutex_unlock_wrapper(wasm_exec_env_t exec_env, uint32 *mutex)
     if (!info_node || info_node->type != T_MUTEX)
         return -1;
 
-    return os_mutex_unlock(info_node->u.mutex);
+    return os_thread_mutex_unlock(info_node->u.mutex);
 }
 
 static int32
@@ -834,7 +834,7 @@ pthread_mutex_destroy_wrapper(wasm_exec_env_t exec_env, uint32 *mutex)
     if (!info_node || info_node->type != T_MUTEX)
         return -1;
 
-    ret_val = os_mutex_destroy(info_node->u.mutex);
+    ret_val = os_thread_mutex_destroy(info_node->u.mutex);
 
     info_node->status = MUTEX_DESTROYED;
     delete_thread_info_node(info_node);
@@ -975,7 +975,7 @@ pthread_key_create_wrapper(wasm_exec_env_t exec_env, int32 *key,
         }
     }
 
-    os_mutex_lock(&info->key_data_list_lock);
+    os_thread_mutex_lock(&info->key_data_list_lock);
     for (i = 0; i < WAMR_PTHREAD_KEYS_MAX; i++) {
         if (!info->key_data_list[i].is_created) {
             break;
@@ -983,14 +983,14 @@ pthread_key_create_wrapper(wasm_exec_env_t exec_env, int32 *key,
     }
 
     if (i == WAMR_PTHREAD_KEYS_MAX) {
-        os_mutex_unlock(&info->key_data_list_lock);
+        os_thread_mutex_unlock(&info->key_data_list_lock);
         return -1;
     }
 
     info->key_data_list[i].destructor_func = destructor_elem_index;
     info->key_data_list[i].is_created = true;
     *key = i;
-    os_mutex_unlock(&info->key_data_list_lock);
+    os_thread_mutex_unlock(&info->key_data_list_lock);
 
     return 0;
 }
@@ -1006,16 +1006,16 @@ pthread_setspecific_wrapper(wasm_exec_env_t exec_env, int32 key,
     if (!info)
         return -1;
 
-    os_mutex_lock(&info->key_data_list_lock);
+    os_thread_mutex_lock(&info->key_data_list_lock);
 
     key_values = key_value_list_lookup_or_create(exec_env, info, key);
     if (!key_values) {
-        os_mutex_unlock(&info->key_data_list_lock);
+        os_thread_mutex_unlock(&info->key_data_list_lock);
         return -1;
     }
 
     key_values[key] = value_offset;
-    os_mutex_unlock(&info->key_data_list_lock);
+    os_thread_mutex_unlock(&info->key_data_list_lock);
 
     return 0;
 }
@@ -1030,16 +1030,16 @@ pthread_getspecific_wrapper(wasm_exec_env_t exec_env, int32 key)
     if (!info)
         return 0;
 
-    os_mutex_lock(&info->key_data_list_lock);
+    os_thread_mutex_lock(&info->key_data_list_lock);
 
     key_values = key_value_list_lookup_or_create(exec_env, info, key);
     if (!key_values) {
-        os_mutex_unlock(&info->key_data_list_lock);
+        os_thread_mutex_unlock(&info->key_data_list_lock);
         return 0;
     }
 
     ret = key_values[key];
-    os_mutex_unlock(&info->key_data_list_lock);
+    os_thread_mutex_unlock(&info->key_data_list_lock);
 
     return ret;
 }
@@ -1054,15 +1054,15 @@ pthread_key_delete_wrapper(wasm_exec_env_t exec_env, int32 key)
     if (!info)
         return -1;
 
-    os_mutex_lock(&info->key_data_list_lock);
+    os_thread_mutex_lock(&info->key_data_list_lock);
     data = key_data_list_lookup(exec_env, key);
     if (!data) {
-        os_mutex_unlock(&info->key_data_list_lock);
+        os_thread_mutex_unlock(&info->key_data_list_lock);
         return -1;
     }
 
     memset(data, 0, sizeof(KeyData));
-    os_mutex_unlock(&info->key_data_list_lock);
+    os_thread_mutex_unlock(&info->key_data_list_lock);
 
     return 0;
 }

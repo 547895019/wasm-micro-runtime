@@ -109,7 +109,7 @@ mem_allocator_create(void *mem, uint32_t size)
 
     allocator_tlsf->tlsf = tlsf;
 
-    if (os_mutex_init(&allocator_tlsf->lock)) {
+    if (os_thread_mutex_init(&allocator_tlsf->lock)) {
         printf("Create mem allocator failed: tlsf_malloc failed.\n");
         tlsf_free(tlsf, allocator_tlsf);
         tlsf_destroy(tlsf);
@@ -125,7 +125,7 @@ mem_allocator_destroy(mem_allocator_t allocator)
     mem_allocator_tlsf *allocator_tlsf = (mem_allocator_tlsf *)allocator;
     tlsf_t tlsf = allocator_tlsf->tlsf;
 
-    os_mutex_destroy(&allocator_tlsf->lock);
+    os_thread_mutex_destroy(&allocator_tlsf->lock);
     tlsf_free(tlsf, allocator_tlsf);
     tlsf_destroy(tlsf);
 }
@@ -140,9 +140,9 @@ mem_allocator_malloc(mem_allocator_t allocator, uint32_t size)
         /* tlsf doesn't allow to allocate 0 byte */
         size = 1;
 
-    os_mutex_lock(&allocator_tlsf->lock);
+    os_thread_mutex_lock(&allocator_tlsf->lock);
     ret = tlsf_malloc(allocator_tlsf->tlsf, size);
-    os_mutex_unlock(&allocator_tlsf->lock);
+    os_thread_mutex_unlock(&allocator_tlsf->lock);
     return ret;
 }
 
@@ -156,9 +156,9 @@ mem_allocator_realloc(mem_allocator_t allocator, void *ptr, uint32_t size)
         /* tlsf doesn't allow to allocate 0 byte */
         size = 1;
 
-    os_mutex_lock(&allocator_tlsf->lock);
+    os_thread_mutex_lock(&allocator_tlsf->lock);
     ret = tlsf_realloc(allocator_tlsf->tlsf, ptr, size);
-    os_mutex_unlock(&allocator_tlsf->lock);
+    os_thread_mutex_unlock(&allocator_tlsf->lock);
     return ret;
 }
 
@@ -167,9 +167,9 @@ mem_allocator_free(mem_allocator_t allocator, void *ptr)
 {
     if (ptr) {
         mem_allocator_tlsf *allocator_tlsf = (mem_allocator_tlsf *)allocator;
-        os_mutex_lock(&allocator_tlsf->lock);
+        os_thread_mutex_lock(&allocator_tlsf->lock);
         tlsf_free(allocator_tlsf->tlsf, ptr);
-        os_mutex_unlock(&allocator_tlsf->lock);
+        os_thread_mutex_unlock(&allocator_tlsf->lock);
     }
 }
 

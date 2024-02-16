@@ -41,9 +41,9 @@ iwasm_main(void *arg)
     /* configure memory allocation */
     memset(&init_args, 0, sizeof(RuntimeInitArgs));
     init_args.mem_alloc_type = Alloc_With_Allocator;
-    init_args.mem_alloc_option.allocator.malloc_func = (void *)os_malloc;
-    init_args.mem_alloc_option.allocator.realloc_func = (void *)os_realloc;
-    init_args.mem_alloc_option.allocator.free_func = (void *)os_free;
+    init_args.mem_alloc_option.allocator.malloc_func = (void *)os_platform_malloc;
+    init_args.mem_alloc_option.allocator.realloc_func = (void *)os_platform_realloc;
+    init_args.mem_alloc_option.allocator.free_func = (void *)os_platform_free;
 
     ESP_LOGI(LOG_TAG, "Initialize WASM runtime");
     /* initialize runtime environment */

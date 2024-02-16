@@ -81,7 +81,7 @@ bh_vector_init(Vector *vector, size_t init_length, size_t size_elem,
             return false;
         }
 
-        if (BHT_OK != os_mutex_init(vector->lock)) {
+        if (BHT_OK != os_thread_mutex_init(vector->lock)) {
             LOG_ERROR("Init vector failed: init locker failed.\n");
 
             BH_FREE(vector->lock);
@@ -109,11 +109,11 @@ bh_vector_set(Vector *vector, uint32 index, const void *elem_buf)
     }
 
     if (vector->lock)
-        os_mutex_lock(vector->lock);
+        os_thread_mutex_lock(vector->lock);
     bh_memcpy_s(vector->data + vector->size_elem * index, vector->size_elem,
                 elem_buf, vector->size_elem);
     if (vector->lock)
-        os_mutex_unlock(vector->lock);
+        os_thread_mutex_unlock(vector->lock);
     return true;
 }
 
@@ -131,11 +131,11 @@ bh_vector_get(Vector *vector, uint32 index, void *elem_buf)
     }
 
     if (vector->lock)
-        os_mutex_lock(vector->lock);
+        os_thread_mutex_lock(vector->lock);
     bh_memcpy_s(elem_buf, vector->size_elem,
                 vector->data + vector->size_elem * index, vector->size_elem);
     if (vector->lock)
-        os_mutex_unlock(vector->lock);
+        os_thread_mutex_unlock(vector->lock);
     return true;
 }
 
@@ -157,7 +157,7 @@ bh_vector_insert(Vector *vector, uint32 index, const void *elem_buf)
     }
 
     if (vector->lock)
-        os_mutex_lock(vector->lock);
+        os_thread_mutex_lock(vector->lock);
 
     if (!extend_vector(vector, vector->num_elems + 1)) {
         LOG_ERROR("Insert vector elem failed: extend vector failed.\n");
@@ -177,7 +177,7 @@ bh_vector_insert(Vector *vector, uint32 index, const void *elem_buf)
 
 unlock_return:
     if (vector->lock)
-        os_mutex_unlock(vector->lock);
+        os_thread_mutex_unlock(vector->lock);
 just_return:
     return ret;
 }
@@ -194,7 +194,7 @@ bh_vector_append(Vector *vector, const void *elem_buf)
 
     /* make sure one more slot is used by the thread who allocas it */
     if (vector->lock)
-        os_mutex_lock(vector->lock);
+        os_thread_mutex_lock(vector->lock);
 
     if (!extend_vector(vector, vector->num_elems + 1)) {
         LOG_ERROR("Append ector elem failed: extend vector failed.\n");
@@ -208,7 +208,7 @@ bh_vector_append(Vector *vector, const void *elem_buf)
 
 unlock_return:
     if (vector->lock)
-        os_mutex_unlock(vector->lock);
+        os_thread_mutex_unlock(vector->lock);
 just_return:
     return ret;
 }
@@ -230,7 +230,7 @@ bh_vector_remove(Vector *vector, uint32 index, void *old_elem_buf)
     }
 
     if (vector->lock)
-        os_mutex_lock(vector->lock);
+        os_thread_mutex_lock(vector->lock);
     p = vector->data + vector->size_elem * index;
 
     if (old_elem_buf) {
@@ -245,7 +245,7 @@ bh_vector_remove(Vector *vector, uint32 index, void *old_elem_buf)
 
     vector->num_elems--;
     if (vector->lock)
-        os_mutex_unlock(vector->lock);
+        os_thread_mutex_unlock(vector->lock);
     return true;
 }
 
@@ -267,7 +267,7 @@ bh_vector_destroy(Vector *vector)
         BH_FREE(vector->data);
 
     if (vector->lock) {
-        os_mutex_destroy(vector->lock);
+        os_thread_mutex_destroy(vector->lock);
         BH_FREE(vector->lock);
     }
 

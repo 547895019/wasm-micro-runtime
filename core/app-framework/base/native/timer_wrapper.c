@@ -48,7 +48,7 @@ thread_modulers_timer_check(void *arg)
 
     while (timer_thread_run) {
         ms_to_expiry = (uint32)-1;
-        os_mutex_lock(&g_timer_ctx_list_mutex);
+        os_thread_mutex_lock(&g_timer_ctx_list_mutex);
         timer_ctx_node_t *elem =
             (timer_ctx_node_t *)bh_list_first_elem(&g_timer_ctx_list);
         while (elem) {
@@ -60,16 +60,16 @@ thread_modulers_timer_check(void *arg)
 
             elem = (timer_ctx_node_t *)bh_list_elem_next(elem);
         }
-        os_mutex_unlock(&g_timer_ctx_list_mutex);
+        os_thread_mutex_unlock(&g_timer_ctx_list_mutex);
 
         if (ms_to_expiry == (uint32)-1)
             us_to_wait = BHT_WAIT_FOREVER;
         else
             us_to_wait = (uint64)ms_to_expiry * 1000;
-        os_mutex_lock(&g_timer_ctx_list_mutex);
+        os_thread_mutex_lock(&g_timer_ctx_list_mutex);
         os_cond_reltimedwait(&g_timer_ctx_list_cond, &g_timer_ctx_list_mutex,
                              us_to_wait);
-        os_mutex_unlock(&g_timer_ctx_list_mutex);
+        os_thread_mutex_unlock(&g_timer_ctx_list_mutex);
     }
 
     return NULL;
@@ -78,9 +78,9 @@ thread_modulers_timer_check(void *arg)
 void
 wakeup_modules_timer_thread(timer_ctx_t ctx)
 {
-    os_mutex_lock(&g_timer_ctx_list_mutex);
+    os_thread_mutex_lock(&g_timer_ctx_list_mutex);
     os_cond_signal(&g_timer_ctx_list_cond);
-    os_mutex_unlock(&g_timer_ctx_list_mutex);
+    os_thread_mutex_unlock(&g_timer_ctx_list_mutex);
 }
 
 bool
@@ -107,7 +107,7 @@ init_wasm_timer()
     return true;
 
 fail2:
-    os_mutex_destroy(&g_timer_ctx_list_mutex);
+    os_thread_mutex_destroy(&g_timer_ctx_list_mutex);
 
 fail1:
     os_cond_destroy(&g_timer_ctx_list_cond);
@@ -140,9 +140,9 @@ create_wasm_timer_ctx(unsigned int module_id, int prealloc_num)
     memset(node, 0, sizeof(*node));
     node->timer_ctx = ctx;
 
-    os_mutex_lock(&g_timer_ctx_list_mutex);
+    os_thread_mutex_lock(&g_timer_ctx_list_mutex);
     bh_list_insert(&g_timer_ctx_list, node);
-    os_mutex_unlock(&g_timer_ctx_list_mutex);
+    os_thread_mutex_unlock(&g_timer_ctx_list_mutex);
 
     return ctx;
 }
@@ -152,7 +152,7 @@ destroy_module_timer_ctx(unsigned int module_id)
 {
     timer_ctx_node_t *elem;
 
-    os_mutex_lock(&g_timer_ctx_list_mutex);
+    os_thread_mutex_lock(&g_timer_ctx_list_mutex);
     elem = (timer_ctx_node_t *)bh_list_first_elem(&g_timer_ctx_list);
     while (elem) {
         if (timer_ctx_get_owner(elem->timer_ctx) == module_id) {
@@ -164,7 +164,7 @@ destroy_module_timer_ctx(unsigned int module_id)
 
         elem = (timer_ctx_node_t *)bh_list_elem_next(elem);
     }
-    os_mutex_unlock(&g_timer_ctx_list_mutex);
+    os_thread_mutex_unlock(&g_timer_ctx_list_mutex);
 }
 
 timer_ctx_t

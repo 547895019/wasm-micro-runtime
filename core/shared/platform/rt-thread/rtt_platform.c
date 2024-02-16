@@ -24,7 +24,7 @@ bh_platform_destroy(void)
 {}
 
 void *
-os_malloc(unsigned size)
+os_platform_malloc(unsigned size)
 {
     void *buf_origin;
     void *buf_fixed;
@@ -43,7 +43,7 @@ os_malloc(unsigned size)
 }
 
 void *
-os_realloc(void *ptr, unsigned size)
+os_platform_realloc(void *ptr, unsigned size)
 {
 
     void *mem_origin;
@@ -75,7 +75,7 @@ os_realloc(void *ptr, unsigned size)
 }
 
 void
-os_free(void *ptr)
+os_platform_free(void *ptr)
 {
     void *mem_origin;
     rt_ubase_t *addr_field;
@@ -135,25 +135,25 @@ os_thread_get_stack_boundary(void)
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     return rt_mutex_init(mutex, "wamr0", RT_IPC_FLAG_FIFO);
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     return rt_mutex_detach(mutex);
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     return rt_mutex_take(mutex, RT_WAITING_FOREVER);
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
     return rt_mutex_release(mutex);
 }

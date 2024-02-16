@@ -27,6 +27,18 @@ extern "C" {
         send_error_response_to_host(mid, INTERNAL_SERVER_ERROR_5_00, err_msg); \
     } while (0)
 
+typedef void (*resource_payload_handler_t)(request_t *request);
+extern bool
+app_manager_register_payload_callback(resource_payload_handler_t handler);
+
+typedef void (*resource_install_handler_t)(request_t *request);
+extern bool
+app_manager_register_install_callback(resource_install_handler_t handler);
+
+typedef void (*resource_uninstall_handler_t)(request_t *request);
+extern bool
+app_manager_register_uninstall_callback(resource_uninstall_handler_t handler);
+
 extern module_interface *g_module_interfaces[Module_Max];
 
 /* Lock of the module data list */
@@ -79,6 +91,14 @@ app_manager_signature_verify(const uint8_t *file, unsigned int file_len,
 void
 targeted_app_request_handler(request_t *request, void *unused);
 
+bool
+app_manager_register_payload_callback(resource_payload_handler_t handler);
+
+bool
+app_manager_register_install_callback(resource_install_handler_t handler);
+
+bool
+app_manager_register_uninstall_callback(resource_uninstall_handler_t handler);
 #ifdef __cplusplus
 } /* end of extern "C" */
 #endif

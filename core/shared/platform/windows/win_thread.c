@@ -81,7 +81,7 @@ os_thread_sys_init()
     if (os_sem_init(&supervisor_thread_data.wait_node.sem) != BHT_OK)
         goto fail1;
 
-    if (os_mutex_init(&supervisor_thread_data.wait_lock) != BHT_OK)
+    if (os_thread_mutex_init(&supervisor_thread_data.wait_lock) != BHT_OK)
         goto fail2;
 
     if (os_cond_init(&supervisor_thread_data.wait_cond) != BHT_OK)
@@ -101,7 +101,7 @@ os_thread_sys_init()
 fail4:
     os_cond_destroy(&supervisor_thread_data.wait_cond);
 fail3:
-    os_mutex_destroy(&supervisor_thread_data.wait_lock);
+    os_thread_mutex_destroy(&supervisor_thread_data.wait_lock);
 fail2:
     os_sem_destroy(&supervisor_thread_data.wait_node.sem);
 fail1:
@@ -114,7 +114,7 @@ os_thread_sys_destroy()
 {
     if (is_thread_sys_inited) {
         os_cond_destroy(&supervisor_thread_data.wait_cond);
-        os_mutex_destroy(&supervisor_thread_data.wait_lock);
+        os_thread_mutex_destroy(&supervisor_thread_data.wait_lock);
         os_sem_destroy(&supervisor_thread_data.wait_node.sem);
         memset(&supervisor_thread_data, 0, sizeof(os_thread_data));
         TlsFree(thread_data_key);
@@ -136,7 +136,7 @@ os_thread_cleanup(void *retval)
 
     bh_assert(thread_data != NULL);
 
-    os_mutex_lock(&thread_data->wait_lock);
+    os_thread_mutex_lock(&thread_data->wait_lock);
     if (thread_data->thread_wait_list) {
         /* Signal each joining thread */
         os_thread_wait_list head = thread_data->thread_wait_list;
@@ -148,12 +148,12 @@ os_thread_cleanup(void *retval)
         }
         thread_data->thread_wait_list = NULL;
     }
-    os_mutex_unlock(&thread_data->wait_lock);
+    os_thread_mutex_unlock(&thread_data->wait_lock);
 
     /* Destroy resources */
     os_cond_destroy(&thread_data->wait_cond);
     os_sem_destroy(&thread_data->wait_node.sem);
-    os_mutex_destroy(&thread_data->wait_lock);
+    os_thread_mutex_destroy(&thread_data->wait_lock);
     BH_FREE(thread_data);
 }
 
@@ -168,7 +168,7 @@ static unsigned __stdcall os_thread_wrapper(void *arg)
     os_printf("THREAD CREATED %p\n", thread_data);
 #endif
 
-    os_mutex_lock(&parent->wait_lock);
+    os_thread_mutex_lock(&parent->wait_lock);
     thread_data->thread_id = GetCurrentThreadId();
     result = TlsSetValue(thread_data_key, thread_data);
 #ifdef OS_ENABLE_HW_BOUND_CHECK
@@ -177,7 +177,7 @@ static unsigned __stdcall os_thread_wrapper(void *arg)
 #endif
     /* Notify parent thread */
     os_cond_signal(&parent->wait_cond);
-    os_mutex_unlock(&parent->wait_lock);
+    os_thread_mutex_unlock(&parent->wait_lock);
 
     if (!result)
         return -1;
@@ -212,22 +212,22 @@ os_thread_create_with_prio(korp_tid *p_tid, thread_start_routine_t start,
     if (os_sem_init(&thread_data->wait_node.sem) != BHT_OK)
         goto fail1;
 
-    if (os_mutex_init(&thread_data->wait_lock) != BHT_OK)
+    if (os_thread_mutex_init(&thread_data->wait_lock) != BHT_OK)
         goto fail2;
 
     if (os_cond_init(&thread_data->wait_cond) != BHT_OK)
         goto fail3;
 
-    os_mutex_lock(&parent->wait_lock);
+    os_thread_mutex_lock(&parent->wait_lock);
     if (!_beginthreadex(NULL, stack_size, os_thread_wrapper, thread_data, 0,
                         NULL)) {
-        os_mutex_unlock(&parent->wait_lock);
+        os_thread_mutex_unlock(&parent->wait_lock);
         goto fail4;
     }
     /* Wait for the thread routine to set thread_data's tid
        and add thread_data to thread data list */
     os_cond_wait(&parent->wait_cond, &parent->wait_lock);
-    os_mutex_unlock(&parent->wait_lock);
+    os_thread_mutex_unlock(&parent->wait_lock);
 
     *p_tid = (korp_tid)thread_data;
     return BHT_OK;
@@ -235,7 +235,7 @@ os_thread_create_with_prio(korp_tid *p_tid, thread_start_routine_t start,
 fail4:
     os_cond_destroy(&thread_data->wait_cond);
 fail3:
-    os_mutex_destroy(&thread_data->wait_lock);
+    os_thread_mutex_destroy(&thread_data->wait_lock);
 fail2:
     os_sem_destroy(&thread_data->wait_node.sem);
 fail1:
@@ -270,7 +270,7 @@ os_thread_join(korp_tid thread, void **p_retval)
     thread_data = (os_thread_data *)thread;
     bh_assert(thread_data);
 
-    os_mutex_lock(&thread_data->wait_lock);
+    os_thread_mutex_lock(&thread_data->wait_lock);
     if (!thread_data->thread_wait_list)
         thread_data->thread_wait_list = &curr_thread_data->wait_node;
     else {
@@ -280,7 +280,7 @@ os_thread_join(korp_tid thread, void **p_retval)
             p = p->next;
         p->next = &curr_thread_data->wait_node;
     }
-    os_mutex_unlock(&thread_data->wait_lock);
+    os_thread_mutex_unlock(&thread_data->wait_lock);
 
     /* Wait the sem */
     os_sem_wait(&curr_thread_data->wait_node.sem);
@@ -322,7 +322,7 @@ os_thread_env_init()
     if (os_sem_init(&thread_data->wait_node.sem) != BHT_OK)
         goto fail1;
 
-    if (os_mutex_init(&thread_data->wait_lock) != BHT_OK)
+    if (os_thread_mutex_init(&thread_data->wait_lock) != BHT_OK)
         goto fail2;
 
     if (os_cond_init(&thread_data->wait_cond) != BHT_OK)
@@ -336,7 +336,7 @@ os_thread_env_init()
 fail4:
     os_cond_destroy(&thread_data->wait_cond);
 fail3:
-    os_mutex_destroy(&thread_data->wait_lock);
+    os_thread_mutex_destroy(&thread_data->wait_lock);
 fail2:
     os_sem_destroy(&thread_data->wait_node.sem);
 fail1:
@@ -354,7 +354,7 @@ os_thread_env_destroy()
     if (thread_data && thread_data != &supervisor_thread_data) {
         TlsSetValue(thread_data_key, NULL);
         os_cond_destroy(&thread_data->wait_cond);
-        os_mutex_destroy(&thread_data->wait_lock);
+        os_thread_mutex_destroy(&thread_data->wait_lock);
         os_sem_destroy(&thread_data->wait_node.sem);
         BH_FREE(thread_data);
     }
@@ -441,7 +441,7 @@ os_sem_signal(korp_sem *sem)
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     bh_assert(mutex);
     *mutex = CreateMutex(NULL, FALSE, NULL);
@@ -457,14 +457,14 @@ os_recursive_mutex_init(korp_mutex *mutex)
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     assert(mutex);
     return CloseHandle(*mutex) ? BHT_OK : BHT_ERROR;
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     int ret;
 
@@ -474,7 +474,7 @@ os_mutex_lock(korp_mutex *mutex)
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
     bh_assert(mutex);
     return ReleaseMutex(*mutex) ? BHT_OK : BHT_ERROR;
@@ -484,7 +484,7 @@ int
 os_cond_init(korp_cond *cond)
 {
     bh_assert(cond);
-    if (os_mutex_init(&cond->wait_list_lock) != BHT_OK)
+    if (os_thread_mutex_init(&cond->wait_list_lock) != BHT_OK)
         return BHT_ERROR;
 
     cond->thread_wait_list = NULL;
@@ -495,7 +495,7 @@ int
 os_cond_destroy(korp_cond *cond)
 {
     bh_assert(cond);
-    os_mutex_destroy(&cond->wait_list_lock);
+    os_thread_mutex_destroy(&cond->wait_list_lock);
     return BHT_OK;
 }
 
@@ -509,7 +509,7 @@ os_cond_wait_internal(korp_cond *cond, korp_mutex *mutex, bool timed,
 
     bh_assert(cond);
     bh_assert(mutex);
-    os_mutex_lock(&cond->wait_list_lock);
+    os_thread_mutex_lock(&cond->wait_list_lock);
     if (!cond->thread_wait_list)
         cond->thread_wait_list = node;
     else {
@@ -519,19 +519,19 @@ os_cond_wait_internal(korp_cond *cond, korp_mutex *mutex, bool timed,
             p = p->next;
         p->next = node;
     }
-    os_mutex_unlock(&cond->wait_list_lock);
+    os_thread_mutex_unlock(&cond->wait_list_lock);
 
     /* Unlock mutex, wait sem and lock mutex again */
-    os_mutex_unlock(mutex);
+    os_thread_mutex_unlock(mutex);
     int wait_result;
     if (timed)
         wait_result = os_sem_reltimed_wait(&node->sem, useconds);
     else
         wait_result = os_sem_wait(&node->sem);
-    os_mutex_lock(mutex);
+    os_thread_mutex_lock(mutex);
 
     /* Remove wait node from wait list */
-    os_mutex_lock(&cond->wait_list_lock);
+    os_thread_mutex_lock(&cond->wait_list_lock);
     if (cond->thread_wait_list == node)
         cond->thread_wait_list = node->next;
     else {
@@ -541,7 +541,7 @@ os_cond_wait_internal(korp_cond *cond, korp_mutex *mutex, bool timed,
             p = p->next;
         p->next = node->next;
     }
-    os_mutex_unlock(&cond->wait_list_lock);
+    os_thread_mutex_unlock(&cond->wait_list_lock);
 
     return wait_result;
 }
@@ -567,10 +567,10 @@ int
 os_cond_signal(korp_cond *cond)
 {
     /* Signal the head wait node of wait list */
-    os_mutex_lock(&cond->wait_list_lock);
+    os_thread_mutex_lock(&cond->wait_list_lock);
     if (cond->thread_wait_list)
         os_sem_signal(&cond->thread_wait_list->sem);
-    os_mutex_unlock(&cond->wait_list_lock);
+    os_thread_mutex_unlock(&cond->wait_list_lock);
 
     return BHT_OK;
 }
@@ -579,7 +579,7 @@ int
 os_cond_broadcast(korp_cond *cond)
 {
     /* Signal all of the wait node of wait list */
-    os_mutex_lock(&cond->wait_list_lock);
+    os_thread_mutex_lock(&cond->wait_list_lock);
     if (cond->thread_wait_list) {
         os_thread_wait_node *p = cond->thread_wait_list;
         while (p) {
@@ -588,7 +588,7 @@ os_cond_broadcast(korp_cond *cond)
         }
     }
 
-    os_mutex_unlock(&cond->wait_list_lock);
+    os_thread_mutex_unlock(&cond->wait_list_lock);
 
     return BHT_OK;
 }

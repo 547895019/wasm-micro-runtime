@@ -67,7 +67,7 @@ remove_timer_from(timer_ctx_t ctx, uint32 timer_id, bool active_list)
 {
     app_timer_t **head, *prev, *t;
 
-    os_mutex_lock(&ctx->mutex);
+    os_thread_mutex_lock(&ctx->mutex);
 
     if (active_list)
         head = &ctx->app_timers;
@@ -89,7 +89,7 @@ remove_timer_from(timer_ctx_t ctx, uint32 timer_id, bool active_list)
                 PRINT("removed timer [%d] after [%d] from list %d\n", t->id,
                       prev->id, active_list);
             }
-            os_mutex_unlock(&ctx->mutex);
+            os_thread_mutex_unlock(&ctx->mutex);
 
             if (active_list && prev == NULL && ctx->refresh_checker)
                 ctx->refresh_checker(ctx);
@@ -101,7 +101,7 @@ remove_timer_from(timer_ctx_t ctx, uint32 timer_id, bool active_list)
         }
     }
 
-    os_mutex_unlock(&ctx->mutex);
+    os_thread_mutex_unlock(&ctx->mutex);
     return NULL;
 }
 
@@ -127,7 +127,7 @@ reschedule_timer(timer_ctx_t ctx, app_timer_t *timer)
     app_timer_t *t;
     app_timer_t *prev = NULL;
 
-    os_mutex_lock(&ctx->mutex);
+    os_thread_mutex_lock(&ctx->mutex);
 
     t = ctx->app_timers;
     timer->next = NULL;
@@ -169,7 +169,7 @@ reschedule_timer(timer_ctx_t ctx, app_timer_t *timer)
     }
 
 out:
-    os_mutex_unlock(&ctx->mutex);
+    os_thread_mutex_unlock(&ctx->mutex);
 
     /* ensure the refresh_checker() is called out of the lock */
     if (prev == NULL && ctx->refresh_checker)
@@ -180,11 +180,11 @@ static void
 release_timer(timer_ctx_t ctx, app_timer_t *t)
 {
     if (ctx->pre_allocated) {
-        os_mutex_lock(&ctx->mutex);
+        os_thread_mutex_lock(&ctx->mutex);
         t->next = ctx->free_timers;
         ctx->free_timers = t;
         PRINT("recycle timer :%d\n", t->id);
-        os_mutex_unlock(&ctx->mutex);
+        os_thread_mutex_unlock(&ctx->mutex);
     }
     else {
         PRINT("destroy timer :%d\n", t->id);
@@ -243,7 +243,7 @@ create_timer_ctx(timer_callback_f timer_handler,
     if (os_cond_init(&ctx->cond) != 0)
         goto cleanup;
 
-    if (os_mutex_init(&ctx->mutex) != 0) {
+    if (os_thread_mutex_init(&ctx->mutex) != 0) {
         os_cond_destroy(&ctx->cond);
         goto cleanup;
     }
@@ -272,7 +272,7 @@ destroy_timer_ctx(timer_ctx_t ctx)
     cleanup_app_timers(ctx);
 
     os_cond_destroy(&ctx->cond);
-    os_mutex_destroy(&ctx->mutex);
+    os_thread_mutex_destroy(&ctx->mutex);
     BH_FREE(ctx);
 }
 
@@ -285,10 +285,10 @@ timer_ctx_get_owner(timer_ctx_t ctx)
 void
 add_idle_timer(timer_ctx_t ctx, app_timer_t *timer)
 {
-    os_mutex_lock(&ctx->mutex);
+    os_thread_mutex_lock(&ctx->mutex);
     timer->next = ctx->idle_timers;
     ctx->idle_timers = timer;
-    os_mutex_unlock(&ctx->mutex);
+    os_thread_mutex_unlock(&ctx->mutex);
 }
 
 uint32
@@ -410,14 +410,14 @@ get_expiry_ms(timer_ctx_t ctx)
     uint32 ms_to_next_expiry;
     uint64 now = bh_get_tick_ms();
 
-    os_mutex_lock(&ctx->mutex);
+    os_thread_mutex_lock(&ctx->mutex);
     if (ctx->app_timers == NULL)
         ms_to_next_expiry = (uint32)-1;
     else if (ctx->app_timers->expiry >= now)
         ms_to_next_expiry = (uint32)(ctx->app_timers->expiry - now);
     else
         ms_to_next_expiry = 0;
-    os_mutex_unlock(&ctx->mutex);
+    os_thread_mutex_unlock(&ctx->mutex);
 
     return ms_to_next_expiry;
 }
@@ -428,7 +428,7 @@ check_app_timers(timer_ctx_t ctx)
     app_timer_t *t, *expired = NULL, *expired_end = NULL;
     uint64 now = bh_get_tick_ms();
 
-    os_mutex_lock(&ctx->mutex);
+    os_thread_mutex_lock(&ctx->mutex);
 
     t = ctx->app_timers;
     while (t) {
@@ -451,7 +451,7 @@ check_app_timers(timer_ctx_t ctx)
             break;
         }
     }
-    os_mutex_unlock(&ctx->mutex);
+    os_thread_mutex_unlock(&ctx->mutex);
 
     handle_expired_timers(ctx, expired);
     return get_expiry_ms(ctx);
@@ -460,10 +460,10 @@ check_app_timers(timer_ctx_t ctx)
 void
 cleanup_app_timers(timer_ctx_t ctx)
 {
-    os_mutex_lock(&ctx->mutex);
+    os_thread_mutex_lock(&ctx->mutex);
 
     release_timer_list(&ctx->app_timers);
     release_timer_list(&ctx->idle_timers);
 
-    os_mutex_unlock(&ctx->mutex);
+    os_thread_mutex_unlock(&ctx->mutex);
 }

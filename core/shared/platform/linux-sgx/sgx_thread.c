@@ -72,7 +72,7 @@ os_self_thread()
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
 #ifndef SGX_DISABLE_PTHREAD
     pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
@@ -82,7 +82,7 @@ os_mutex_init(korp_mutex *mutex)
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
 #ifndef SGX_DISABLE_PTHREAD
     pthread_mutex_destroy(mutex);
@@ -91,7 +91,7 @@ os_mutex_destroy(korp_mutex *mutex)
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
 #ifndef SGX_DISABLE_PTHREAD
     return pthread_mutex_lock(mutex);
@@ -101,7 +101,7 @@ os_mutex_lock(korp_mutex *mutex)
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
 #ifndef SGX_DISABLE_PTHREAD
     return pthread_mutex_unlock(mutex);

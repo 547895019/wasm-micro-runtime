@@ -303,28 +303,28 @@ os_thread_join(korp_tid thread, void **value_ptr)
 // }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     mutex_init(mutex);
     return BHT_OK;
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     (void)mutex;
     return BHT_OK;
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     mutex_lock(mutex);
     return 0; // Riot mutexes do not return until success
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
     mutex_unlock(mutex);
     return 0; // Riot mutexes do not return until success

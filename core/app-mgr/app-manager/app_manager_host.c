@@ -264,7 +264,7 @@ aee_host_msg_callback(void *msg, uint32_t msg_len)
 bool
 app_manager_host_init(host_interface *interface)
 {
-    if (os_mutex_init(&host_lock) != 0) {
+    if (os_thread_mutex_init(&host_lock) != 0) {
         return false;
     }
     memset(&recv_ctx, 0, sizeof(recv_ctx));
@@ -275,7 +275,7 @@ app_manager_host_init(host_interface *interface)
 
     if (host_commu.init != NULL) {
         if (!host_commu.init()) {
-            os_mutex_destroy(&host_lock);
+            os_thread_mutex_destroy(&host_lock);
             return false;
         }
     }
@@ -291,7 +291,7 @@ app_manager_host_send_msg(int msg_type, const char *buf, int size)
         int size_s = size, n;
         char header[16];
 
-        os_mutex_lock(&host_lock);
+        os_thread_mutex_lock(&host_lock);
         /* leading bytes */
         bh_memcpy_s(header, 2, leadings, 2);
 
@@ -306,13 +306,13 @@ app_manager_host_send_msg(int msg_type, const char *buf, int size)
         bh_memcpy_s(header + 4, 4, &size_s, 4);
         n = host_commu.send(NULL, header, 8);
         if (n != 8) {
-            os_mutex_unlock(&host_lock);
+            os_thread_mutex_unlock(&host_lock);
             return 0;
         }
 
         /* payload */
         n = host_commu.send(NULL, buf, size);
-        os_mutex_unlock(&host_lock);
+        os_thread_mutex_unlock(&host_lock);
 
         app_manager_printf("sent %d bytes to host\n", n);
         return n;

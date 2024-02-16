@@ -281,9 +281,9 @@ iwasm(int argc, char **argv)
 
     rt_memset(&init_args, 0, sizeof(RuntimeInitArgs));
     init_args.mem_alloc_type = Alloc_With_Allocator;
-    init_args.mem_alloc_option.allocator.malloc_func = os_malloc;
-    init_args.mem_alloc_option.allocator.realloc_func = os_realloc;
-    init_args.mem_alloc_option.allocator.free_func = os_free;
+    init_args.mem_alloc_option.allocator.malloc_func = os_platform_malloc;
+    init_args.mem_alloc_option.allocator.realloc_func = os_platform_realloc;
+    init_args.mem_alloc_option.allocator.free_func = os_platform_free;
 #ifdef WAMR_ENABLE_RTT_EXPORT
     init_args.native_symbols = native_export_symbols;
     init_args.n_native_symbols =

@@ -120,7 +120,7 @@ os_thread_env_inited();
  * @return 0 if success, -1 otherwise
  */
 int
-os_usleep(uint32 usec);
+os_thread_usleep(uint32 usec);
 
 /**
  * Creates a recursive mutex
@@ -338,6 +338,36 @@ os_socket_shutdown(bh_socket_t socket);
  */
 int
 os_socket_inet_network(const char *cp, uint32 *out);
+
+/**
+ * Get the peer address of the connected to the socket
+ *
+ * @param socket  [INTPUT] the connected socket
+ * @param addr    [OUTPUT] the address of the peer socket. If addr is NULL,
+ *                nothing is filled in, and addrlen will not be used
+ * @param port    [OUTPUT] the port number, if the value is 0,
+ *                it will use a port assigned by OS. On return it will
+ *                contain the actual bound port number
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_getpeername(bh_socket_t socket, uint32 *addr, int *port);
+
+/**
+ * Get the current address of the bound to the socket
+ *
+ * @param socket  [INTPUT] the bound socket
+ * @param addr    [OUTPUT] the address of the bound socket. If addr is NULL,
+ *                nothing is filled in, and addrlen will not be used
+ * @param port    [OUTPUT] the port number, if the value is 0,
+ *                it will use a port assigned by OS. On return it will
+ *                contain the actual bound port number
+ *
+ * @return 0 if success, -1 otherwise
+ */
+int
+os_socket_getsockname(bh_socket_t socket, uint32 *addr, int *port);
 
 #ifdef __cplusplus
 }

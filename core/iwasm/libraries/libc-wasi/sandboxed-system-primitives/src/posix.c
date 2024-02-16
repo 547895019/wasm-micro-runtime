@@ -339,7 +339,7 @@ struct fd_entry {
 };
 
 bool
-fd_table_init(struct fd_table *ft)
+fd_table_posix_init(struct fd_table *ft)
 {
     if (!rwlock_init(&ft->lock))
         return false;
@@ -2860,8 +2860,18 @@ wasi_ssp_sock_addr_local(
     if (error != __WASI_ESUCCESS)
         return error;
 
+    __wasi_addr_t wasi_addr = {
+        .kind = IPv4
+    };
+    int ret = os_socket_getsockname(fd_number(fo), (uint32_t *)&wasi_addr.addr.ip4.addr, (int*)&wasi_addr.addr.ip4.port);
     fd_object_release(fo);
-    return __WASI_ENOSYS;
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    bh_memcpy_s(buf, buf_len, &wasi_addr, sizeof(wasi_addr));
+
+    return __WASI_ESUCCESS;
 }
 
 __wasi_errno_t
@@ -2877,8 +2887,46 @@ wasi_ssp_sock_addr_remote(
     if (error != __WASI_ESUCCESS)
         return error;
 
+    __wasi_addr_t wasi_addr = {
+        .kind = IPv4
+    };
+    int ret = os_socket_getpeername(fd_number(fo),(uint32_t *) &wasi_addr.addr.ip4.addr, (int*)&wasi_addr.addr.ip4.port);
     fd_object_release(fo);
-    return __WASI_ENOSYS;
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    bh_memcpy_s(buf, buf_len, &wasi_addr, sizeof(wasi_addr));
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_addr_resolve(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, const char *host, uint16_t port, uint8 *buf, __wasi_size_t buf_len)
+{
+    struct fd_object *fo;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, __WASI_RIGHT_SOCK_ADDR_REMOTE, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    __wasi_addr_t wasi_addr = {
+        .kind = IPv4,
+        .addr.ip4.port = port
+     };
+    int ret = os_socket_inet_network(host, (uint32_t*)&wasi_addr.addr.ip4);
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    bh_memcpy_s(buf, buf_len, &wasi_addr, sizeof(wasi_addr));
+
+    return __WASI_ESUCCESS;
 }
 
 __wasi_errno_t
@@ -2944,6 +2992,119 @@ wasi_ssp_sock_connect(
     if (BHT_OK != ret) {
         return convert_errno(errno);
     }
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_get_recv_buf_size(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, __wasi_size_t *size)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval;
+    socklen_t optlen = sizeof(optval);
+
+    ret = getsockopt(fd_number(fo), SOL_SOCKET, SO_RCVBUF, &optval, &optlen);
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    *size = optval;
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_get_reuse_addr(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, uint8_t *reuse)
+{
+
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval;
+    socklen_t optlen = sizeof(optval);
+
+    ret = getsockopt(fd_number(fo), SOL_SOCKET, SO_REUSEADDR, &optval, &optlen);
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    *reuse = optval;
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_get_reuse_port(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, uint8_t *reuse)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval;
+    socklen_t optlen = sizeof(optval);
+
+    ret = getsockopt(fd_number(fo), SOL_SOCKET, SO_REUSEPORT, &optval, &optlen);
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    *reuse = optval;
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_get_send_buf_size(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, __wasi_size_t *size)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval;
+    socklen_t optlen = sizeof(optval);
+
+    ret = getsockopt(fd_number(fo), SOL_SOCKET, SO_SNDBUF, &optval, &optlen);
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    *size = optval;
 
     return __WASI_ESUCCESS;
 }
@@ -3018,6 +3179,106 @@ wasi_ssp_sock_open(
                                max_inheriting, sockfd);
     if (error != __WASI_ESUCCESS) {
         return error;
+    }
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_set_recv_buf_size(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, __wasi_size_t size)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval = size;
+
+    ret = setsockopt(fd_number(fo), SOL_SOCKET, SO_RCVBUF, &optval, sizeof(optval));
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_set_reuse_addr(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, uint8_t reuse)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval = reuse;
+
+    ret = setsockopt(fd_number(fo), SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_set_reuse_port(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, uint8_t reuse)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval = reuse;
+
+    ret = setsockopt(fd_number(fo), SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
+    }
+
+    return __WASI_ESUCCESS;
+}
+
+__wasi_errno_t
+wasi_ssp_sock_set_send_buf_size(
+#if !defined(WASMTIME_SSP_STATIC_CURFDS)
+    struct fd_table *curfds,
+#endif
+    __wasi_fd_t fd, __wasi_size_t size)
+{
+    struct fd_object *fo;
+    int ret;
+    __wasi_errno_t error =
+        fd_object_get(curfds, &fo, fd, 0, 0);
+    if (error != __WASI_ESUCCESS)
+        return error;
+
+    int optval = size;
+
+    ret = setsockopt(fd_number(fo), SOL_SOCKET, SO_SNDBUF, &optval, sizeof(optval));
+    fd_object_release(fo);
+    if (BHT_OK != ret) {
+        return convert_errno(errno);
     }
 
     return __WASI_ESUCCESS;

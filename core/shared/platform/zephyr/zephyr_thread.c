@@ -425,7 +425,7 @@ os_thread_join(korp_tid thread, void **value_ptr)
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     k_mutex_init(mutex);
     return BHT_OK;
@@ -439,20 +439,20 @@ os_recursive_mutex_init(korp_mutex *mutex)
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     (void)mutex;
     return BHT_OK;
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     return k_mutex_lock(mutex, K_FOREVER);
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
 #if KERNEL_VERSION_NUMBER >= 0x020200 /* version 2.2.0 */
     return k_mutex_unlock(mutex);

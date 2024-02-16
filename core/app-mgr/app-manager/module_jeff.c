@@ -273,12 +273,12 @@ app_manager_call_java(JeffMethodLinked *method, unsigned int argc,
     jeff_runtime_call_java(method, argc, argv, argt);
 
     if (is_wd_started) {
-        os_mutex_lock(&wd_timer->lock);
+        os_thread_mutex_lock(&wd_timer->lock);
         if (!wd_timer->is_interrupting) {
             wd_timer->is_stopped = true;
             watchdog_timer_stop(wd_timer);
         }
-        os_mutex_unlock(&wd_timer->lock);
+        os_thread_mutex_unlock(&wd_timer->lock);
     }
 
     return !check_exception();

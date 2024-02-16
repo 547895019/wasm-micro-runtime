@@ -101,7 +101,7 @@ connection_interface_t connection_impl = {
 static void
 add_connection(sys_connection_t *conn)
 {
-    os_mutex_lock(&g_lock);
+    os_thread_mutex_lock(&g_lock);
 
     g_handle_max++;
     if (g_handle_max == -1)
@@ -116,7 +116,7 @@ add_connection(sys_connection_t *conn)
         g_connections = conn;
     }
 
-    os_mutex_unlock(&g_lock);
+    os_thread_mutex_unlock(&g_lock);
 }
 
 #define FREE_CONNECTION(conn)             \
@@ -132,7 +132,7 @@ get_app_conns_num(uint32 module_id)
     sys_connection_t *conn;
     int num = 0;
 
-    os_mutex_lock(&g_lock);
+    os_thread_mutex_lock(&g_lock);
 
     conn = g_connections;
     while (conn) {
@@ -141,7 +141,7 @@ get_app_conns_num(uint32 module_id)
         conn = conn->next;
     }
 
-    os_mutex_unlock(&g_lock);
+    os_thread_mutex_unlock(&g_lock);
 
     return num;
 }
@@ -151,7 +151,7 @@ find_connection(uint32 handle, bool remove_found)
 {
     sys_connection_t *conn, *prev = NULL;
 
-    os_mutex_lock(&g_lock);
+    os_thread_mutex_lock(&g_lock);
 
     conn = g_connections;
     while (conn) {
@@ -164,7 +164,7 @@ find_connection(uint32 handle, bool remove_found)
                     g_connections = conn->next;
                 }
             }
-            os_mutex_unlock(&g_lock);
+            os_thread_mutex_unlock(&g_lock);
             return conn;
         }
         else {
@@ -173,7 +173,7 @@ find_connection(uint32 handle, bool remove_found)
         }
     }
 
-    os_mutex_unlock(&g_lock);
+    os_thread_mutex_unlock(&g_lock);
 
     return NULL;
 }
@@ -183,7 +183,7 @@ cleanup_connections(uint32 module_id)
 {
     sys_connection_t *conn, *prev = NULL;
 
-    os_mutex_lock(&g_lock);
+    os_thread_mutex_lock(&g_lock);
 
     conn = g_connections;
     while (conn) {
@@ -208,7 +208,7 @@ cleanup_connections(uint32 module_id)
         }
     }
 
-    os_mutex_unlock(&g_lock);
+    os_thread_mutex_unlock(&g_lock);
 }
 
 static conn_type_t
@@ -574,7 +574,7 @@ init_connection_framework()
     if (epollfd == -1)
         return false;
 
-    if (os_mutex_init(&g_lock) != 0) {
+    if (os_thread_mutex_init(&g_lock) != 0) {
         close(epollfd);
         return false;
     }
@@ -597,7 +597,7 @@ init_connection_framework()
     return true;
 
 fail:
-    os_mutex_destroy(&g_lock);
+    os_thread_mutex_destroy(&g_lock);
     close(epollfd);
     return false;
 }

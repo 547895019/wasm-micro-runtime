@@ -159,7 +159,7 @@ typedef enum {
        malloc function */
     Alloc_With_Allocator,
     /* system allocator mode, allocate memory from system allocator,
-       or, platform's os_malloc function */
+       or, platform's os_platform_malloc function */
     Alloc_With_System_Allocator,
 } mem_alloc_type_t;
 

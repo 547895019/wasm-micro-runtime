@@ -26,11 +26,11 @@ extern "C" {
 #define BH_GB ((BH_MB)*1024)
 
 #ifndef BH_MALLOC
-#define BH_MALLOC os_malloc
+#define BH_MALLOC os_platform_malloc
 #endif
 
 #ifndef BH_FREE
-#define BH_FREE os_free
+#define BH_FREE os_platform_free
 #endif
 
 #ifndef BH_TIME_T_MAX

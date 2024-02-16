@@ -103,7 +103,7 @@ typedef enum {
        malloc function */
     Alloc_With_Allocator,
     /* system allocator mode, allocate memory from system allocator,
-       or, platform's os_malloc function */
+       or, platform's os_platform_malloc function */
     Alloc_With_System_Allocator,
 } mem_alloc_type_t;
 
@@ -173,7 +173,7 @@ typedef struct wasm_val_t {
 
 /**
  * Initialize the WASM runtime environment, and also initialize
- * the memory allocator with system allocator, which calls os_malloc
+ * the memory allocator with system allocator, which calls os_platform_malloc
  * to allocate memory
  *
  * @return true if success, false otherwise

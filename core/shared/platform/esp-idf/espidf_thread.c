@@ -39,25 +39,44 @@ os_self_thread(void)
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     return pthread_mutex_init(mutex, NULL);
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_recursive_mutex_init(korp_mutex *mutex)
+{
+    int ret;
+
+    pthread_mutexattr_t mattr;
+
+    assert(mutex);
+    ret = pthread_mutexattr_init(&mattr);
+    if (ret)
+        return BHT_ERROR;
+
+    pthread_mutexattr_settype(&mattr, PTHREAD_MUTEX_RECURSIVE);
+    ret = pthread_mutex_init(mutex, &mattr);
+    pthread_mutexattr_destroy(&mattr);
+
+    return ret == 0 ? BHT_OK : BHT_ERROR;
+}
+
+int
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     return pthread_mutex_destroy(mutex);
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     return pthread_mutex_lock(mutex);
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
     return pthread_mutex_unlock(mutex);
 }
@@ -93,7 +112,7 @@ os_thread_create_with_prio(korp_tid *tid, thread_start_routine_t start,
 
     if (pthread_create(tid, &tattr, os_thread_wrapper, targ) != 0) {
         pthread_attr_destroy(&tattr);
-        os_free(targ);
+        os_platform_free(targ);
         return BHT_ERROR;
     }
 
@@ -205,4 +224,10 @@ int
 os_cond_signal(korp_cond *cond)
 {
     return pthread_cond_signal(cond);
+}
+
+int
+os_cond_broadcast(korp_cond *cond)
+{
+    return pthread_cond_broadcast(cond);
 }

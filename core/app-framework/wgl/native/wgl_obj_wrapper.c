@@ -81,7 +81,7 @@ cleanup_object_list(uint32 module_id)
 {
     object_node_t *elem;
 
-    os_mutex_lock(&g_object_list_mutex);
+    os_thread_mutex_lock(&g_object_list_mutex);
 
     while (true) {
         bool found = false;
@@ -107,7 +107,7 @@ cleanup_object_list(uint32 module_id)
             break;
     }
 
-    os_mutex_unlock(&g_object_list_mutex);
+    os_thread_mutex_unlock(&g_object_list_mutex);
 }
 
 static bool
@@ -133,20 +133,20 @@ wgl_native_validate_object(int32 obj_id, lv_obj_t **obj)
 {
     object_node_t *elem;
 
-    os_mutex_lock(&g_object_list_mutex);
+    os_thread_mutex_lock(&g_object_list_mutex);
 
     elem = (object_node_t *)bh_list_first_elem(&g_object_list);
     while (elem) {
         if (obj_id == elem->obj_id) {
             if (obj != NULL)
                 *obj = elem->obj;
-            os_mutex_unlock(&g_object_list_mutex);
+            os_thread_mutex_unlock(&g_object_list_mutex);
             return true;
         }
         elem = (object_node_t *)bh_list_elem_next(elem);
     }
 
-    os_mutex_unlock(&g_object_list_mutex);
+    os_thread_mutex_unlock(&g_object_list_mutex);
 
     return false;
 }
@@ -171,9 +171,9 @@ wgl_native_add_object(lv_obj_t *obj, uint32 module_id, uint32 *obj_id)
     node->obj_id = g_obj_id_max;
     node->module_id = module_id;
 
-    os_mutex_lock(&g_object_list_mutex);
+    os_thread_mutex_lock(&g_object_list_mutex);
     bh_list_insert(&g_object_list, node);
-    os_mutex_unlock(&g_object_list_mutex);
+    os_thread_mutex_unlock(&g_object_list_mutex);
 
     if (obj_id != NULL)
         *obj_id = node->obj_id;
@@ -201,20 +201,20 @@ _obj_del_recursive(lv_obj_t *obj)
         i = i_next;
     }
 
-    os_mutex_lock(&g_object_list_mutex);
+    os_thread_mutex_lock(&g_object_list_mutex);
 
     elem = (object_node_t *)bh_list_first_elem(&g_object_list);
     while (elem) {
         if (obj == elem->obj) {
             bh_list_remove(&g_object_list, elem);
             wasm_runtime_free(elem);
-            os_mutex_unlock(&g_object_list_mutex);
+            os_thread_mutex_unlock(&g_object_list_mutex);
             return;
         }
         elem = (object_node_t *)bh_list_elem_next(elem);
     }
 
-    os_mutex_unlock(&g_object_list_mutex);
+    os_thread_mutex_unlock(&g_object_list_mutex);
 }
 
 static void
@@ -263,25 +263,25 @@ internal_lv_obj_event_cb(lv_obj_t *obj, lv_event_t event)
 {
     object_node_t *elem;
 
-    os_mutex_lock(&g_object_list_mutex);
+    os_thread_mutex_lock(&g_object_list_mutex);
 
     elem = (object_node_t *)bh_list_first_elem(&g_object_list);
     while (elem) {
         if (obj == elem->obj) {
             post_widget_msg_to_module(elem, event);
-            os_mutex_unlock(&g_object_list_mutex);
+            os_thread_mutex_unlock(&g_object_list_mutex);
             return;
         }
         elem = (object_node_t *)bh_list_elem_next(elem);
     }
 
-    os_mutex_unlock(&g_object_list_mutex);
+    os_thread_mutex_unlock(&g_object_list_mutex);
 }
 
 static void *
 lv_task_handler_thread_routine(void *arg)
 {
-    os_mutex_lock(&task_handler_lock);
+    os_thread_mutex_lock(&task_handler_lock);
 
     while (lv_task_handler_thread_run) {
         os_cond_reltimedwait(&task_handler_cond, &task_handler_lock,
@@ -289,7 +289,7 @@ lv_task_handler_thread_routine(void *arg)
         lv_task_handler();
     }
 
-    os_mutex_unlock(&task_handler_lock);
+    os_thread_mutex_unlock(&task_handler_lock);
     return NULL;
 }
 
@@ -298,11 +298,11 @@ wgl_init(void)
 {
     korp_tid tid;
 
-    if (os_mutex_init(&task_handler_lock) != 0)
+    if (os_thread_mutex_init(&task_handler_lock) != 0)
         return;
 
     if (os_cond_init(&task_handler_cond) != 0) {
-        os_mutex_destroy(&task_handler_lock);
+        os_thread_mutex_destroy(&task_handler_lock);
         return;
     }
 
@@ -322,7 +322,7 @@ wgl_exit(void)
 {
     lv_task_handler_thread_run = false;
     os_cond_destroy(&task_handler_cond);
-    os_mutex_destroy(&task_handler_lock);
+    os_thread_mutex_destroy(&task_handler_lock);
 }
 
 /* -------------------------------------------------------------------------

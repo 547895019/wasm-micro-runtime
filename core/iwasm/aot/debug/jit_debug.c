@@ -113,11 +113,11 @@ CreateJITCodeEntryInternal(const uint8 *symfile_addr, uint64 symfile_size)
 {
     JITCodeEntry *entry;
 
-    os_mutex_lock(&jit_debug_engine->jit_entry_lock);
+    os_thread_mutex_lock(&jit_debug_engine->jit_entry_lock);
 
     if (!(entry = wasm_runtime_malloc(sizeof(JITCodeEntry)))) {
         LOG_ERROR("WASM JIT Debug Engine error: failed to allocate memory");
-        os_mutex_unlock(&jit_debug_engine->jit_entry_lock);
+        os_thread_mutex_unlock(&jit_debug_engine->jit_entry_lock);
         return NULL;
     }
     entry->symfile_addr_ = symfile_addr;
@@ -135,14 +135,14 @@ CreateJITCodeEntryInternal(const uint8 *symfile_addr, uint64 symfile_size)
 
     (*__jit_debug_register_code_ptr)();
 
-    os_mutex_unlock(&jit_debug_engine->jit_entry_lock);
+    os_thread_mutex_unlock(&jit_debug_engine->jit_entry_lock);
     return entry;
 }
 
 static void
 DestroyJITCodeEntryInternal(JITCodeEntry *entry)
 {
-    os_mutex_lock(&jit_debug_engine->jit_entry_lock);
+    os_thread_mutex_lock(&jit_debug_engine->jit_entry_lock);
 
     if (entry->prev_ != NULL) {
         entry->prev_->next_ = entry->next_;
@@ -161,7 +161,7 @@ DestroyJITCodeEntryInternal(JITCodeEntry *entry)
 
     wasm_runtime_free(entry);
 
-    os_mutex_unlock(&jit_debug_engine->jit_entry_lock);
+    os_thread_mutex_unlock(&jit_debug_engine->jit_entry_lock);
 }
 
 bool
@@ -177,7 +177,7 @@ jit_debug_engine_init()
     }
     memset(jit_debug_engine, 0, sizeof(WASMJITDebugEngine));
 
-    if (os_mutex_init(&jit_debug_engine->jit_entry_lock) != 0) {
+    if (os_thread_mutex_init(&jit_debug_engine->jit_entry_lock) != 0) {
         wasm_runtime_free(jit_debug_engine);
         jit_debug_engine = NULL;
         return false;
@@ -204,7 +204,7 @@ jit_debug_engine_destroy()
         }
 
         /* Destroy JIT Debug Engine */
-        os_mutex_destroy(&jit_debug_engine->jit_entry_lock);
+        os_thread_mutex_destroy(&jit_debug_engine->jit_entry_lock);
         wasm_runtime_free(jit_debug_engine);
         jit_debug_engine = NULL;
     }
@@ -229,9 +229,9 @@ jit_code_entry_create(const uint8 *symfile_addr, uint64 symfile_size)
     }
 
     node->entry = entry;
-    os_mutex_lock(&jit_debug_engine->jit_entry_lock);
+    os_thread_mutex_lock(&jit_debug_engine->jit_entry_lock);
     bh_list_insert(&jit_debug_engine->jit_entry_list, node);
-    os_mutex_unlock(&jit_debug_engine->jit_entry_lock);
+    os_thread_mutex_unlock(&jit_debug_engine->jit_entry_lock);
     return true;
 }
 
@@ -245,9 +245,9 @@ jit_code_entry_destroy(const uint8 *symfile_addr)
         WASMJITEntryNode *next_node = bh_list_elem_next(node);
         if (node->entry->symfile_addr_ == symfile_addr) {
             DestroyJITCodeEntryInternal(node->entry);
-            os_mutex_lock(&jit_debug_engine->jit_entry_lock);
+            os_thread_mutex_lock(&jit_debug_engine->jit_entry_lock);
             bh_list_remove(&jit_debug_engine->jit_entry_list, node);
-            os_mutex_unlock(&jit_debug_engine->jit_entry_lock);
+            os_thread_mutex_unlock(&jit_debug_engine->jit_entry_lock);
             wasm_runtime_free(node);
         }
         node = next_node;

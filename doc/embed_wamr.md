@@ -55,7 +55,7 @@ Developer can also use Makefile to embed WAMR, by defining macros and including 
                                          error_buf, sizeof(error_buf));
 ```
 
-The `wasm_runtime_init()`  uses the default memory allocator os_malloc/os_free function from the [`core/shared/platform`](../core/shared/platform) for the runtime memory management.
+The `wasm_runtime_init()`  uses the default memory allocator os_platform_malloc/os_platform_free function from the [`core/shared/platform`](../core/shared/platform) for the runtime memory management.
 
 WAMR supports to restrict its all memory allocations in a raw buffer. It ensures the dynamic memories used by the WASM applications won't harm the system availability, which is extremely important for embedded systems. This can be done by using `wasm_runtime_full_init()`. This function also allows you to configure the native API's for exporting to WASM app, and set the maximum thread number when multi-thread feature is enabled.
 

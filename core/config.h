@@ -265,7 +265,7 @@
 #endif
 
 /* Max app number of all modules */
-#define MAX_APP_INSTALLATIONS 3
+#define MAX_APP_INSTALLATIONS 10
 
 /* Default timer number in one app */
 #define DEFAULT_TIMERS_PER_APP 20
@@ -312,7 +312,7 @@
       && defined(APP_THREAD_STACK_SIZE_MIN))
 #if defined(BH_PLATFORM_ZEPHYR) || defined(BH_PLATFORM_ALIOS_THINGS) \
     || defined(BH_PLATFORM_ESP_IDF) || defined(BH_PLATFORM_OPENRTOS)
-#define APP_THREAD_STACK_SIZE_DEFAULT (6 * 1024)
+#define APP_THREAD_STACK_SIZE_DEFAULT (16 * 1024)
 #define APP_THREAD_STACK_SIZE_MIN (4 * 1024)
 #elif defined(PTHREAD_STACK_DEFAULT) && defined(PTHREAD_STACK_MIN)
 #define APP_THREAD_STACK_SIZE_DEFAULT PTHREAD_STACK_DEFAULT

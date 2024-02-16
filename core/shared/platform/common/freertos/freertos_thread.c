@@ -302,7 +302,7 @@ os_thread_join(korp_tid thread, void **value_ptr)
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     SemaphoreHandle_t semaphore;
 
@@ -326,14 +326,14 @@ os_recursive_mutex_init(korp_mutex *mutex)
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     vSemaphoreDelete(mutex->sem);
     return BHT_OK;
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     int ret = -1;
 
@@ -345,7 +345,7 @@ os_mutex_lock(korp_mutex *mutex)
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
     int ret = -1;
 
@@ -393,9 +393,9 @@ os_cond_wait_internal(korp_cond *cond, korp_mutex *mutex, bool timed, int mills)
     xSemaphoreGive(cond->wait_list_lock);
 
     /* Unlock mutex, wait sem and lock mutex again */
-    os_mutex_unlock(mutex);
+    os_thread_mutex_unlock(mutex);
     xSemaphoreTake(node->sem, timed ? mills / portTICK_RATE_MS : portMAX_DELAY);
-    os_mutex_lock(mutex);
+    os_thread_mutex_lock(mutex);
 
     /* Remove wait node from wait list */
     xSemaphoreTake(cond->wait_list_lock, portMAX_DELAY);

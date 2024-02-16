@@ -25,10 +25,10 @@ typedef void (*bh_queue_handle_msg_callback)(void *message, void *arg);
 #define bh_queue_mutex korp_mutex
 #define bh_queue_cond korp_cond
 
-#define bh_queue_mutex_init os_mutex_init
-#define bh_queue_mutex_destroy os_mutex_destroy
-#define bh_queue_mutex_lock os_mutex_lock
-#define bh_queue_mutex_unlock os_mutex_unlock
+#define bh_queue_mutex_init os_thread_mutex_init
+#define bh_queue_mutex_destroy os_thread_mutex_destroy
+#define bh_queue_mutex_lock os_thread_mutex_lock
+#define bh_queue_mutex_unlock os_thread_mutex_unlock
 
 #define bh_queue_cond_init os_cond_init
 #define bh_queue_cond_destroy os_cond_destroy

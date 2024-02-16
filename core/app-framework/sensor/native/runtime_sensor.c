@@ -99,11 +99,11 @@ wasm_sensor_config(wasm_exec_env_t exec_env, uint32 sensor, uint32 interval,
         app_manager_get_module_id(Module_WASM_App, module_inst);
     bh_assert(mod_id != ID_NONE);
 
-    os_mutex_lock(&s->lock);
+    os_thread_mutex_lock(&s->lock);
 
     c = find_sensor_client(s, mod_id, false);
     if (c == NULL) {
-        os_mutex_unlock(&s->lock);
+        os_thread_mutex_unlock(&s->lock);
         return false;
     }
 
@@ -111,7 +111,7 @@ wasm_sensor_config(wasm_exec_env_t exec_env, uint32 sensor, uint32 interval,
     c->bit_cfg = bit_cfg;
     c->delay = delay;
 
-    os_mutex_unlock(&s->lock);
+    os_thread_mutex_unlock(&s->lock);
 
     if (s->config != NULL) {
         attr_cont = attr_container_create("config sensor");
@@ -144,19 +144,19 @@ wasm_sensor_open(wasm_exec_env_t exec_env, char *name, int instance)
             app_manager_get_module_id(Module_WASM_App, module_inst);
         bh_assert(mod_id != ID_NONE);
 
-        os_mutex_lock(&s->lock);
+        os_thread_mutex_lock(&s->lock);
 
         c = find_sensor_client(s, mod_id, false);
         if (c) {
             // the app already opened this sensor
-            os_mutex_unlock(&s->lock);
+            os_thread_mutex_unlock(&s->lock);
             return (uint32)-1;
         }
 
         sensor_client_t *client =
             (sensor_client_t *)wasm_runtime_malloc(sizeof(sensor_client_t));
         if (client == NULL) {
-            os_mutex_unlock(&s->lock);
+            os_thread_mutex_unlock(&s->lock);
             return (uint32)-1;
         }
 
@@ -167,7 +167,7 @@ wasm_sensor_open(wasm_exec_env_t exec_env, char *name, int instance)
         client->next = s->clients;
         s->clients = client;
 
-        os_mutex_unlock(&s->lock);
+        os_thread_mutex_unlock(&s->lock);
 
         refresh_read_interval(s);
 
@@ -213,10 +213,10 @@ wasm_sensor_close(wasm_exec_env_t exec_env, uint32 sensor)
     if (s == NULL)
         return false;
 
-    os_mutex_lock(&s->lock);
+    os_thread_mutex_lock(&s->lock);
     if ((c = find_sensor_client(s, client_id, true)) != NULL)
         wasm_runtime_free(c);
-    os_mutex_unlock(&s->lock);
+    os_thread_mutex_unlock(&s->lock);
 
     refresh_read_interval(s);
 
@@ -249,7 +249,7 @@ refresh_read_interval(sensor_obj_t sensor)
 {
     sensor_client_t *c;
     uint32 interval = sensor->default_interval;
-    os_mutex_lock(&sensor->lock);
+    os_thread_mutex_lock(&sensor->lock);
 
     c = sensor->clients;
     if (c)
@@ -261,7 +261,7 @@ refresh_read_interval(sensor_obj_t sensor)
         c = c->next;
     }
 
-    os_mutex_unlock(&sensor->lock);
+    os_thread_mutex_unlock(&sensor->lock);
 
     sensor->read_interval = interval;
 }
@@ -309,7 +309,7 @@ add_sys_sensor(char *name, char *description, int instance,
         g_sys_sensors = s;
     }
 
-    if (os_mutex_init(&s->lock) != 0) {
+    if (os_thread_mutex_init(&s->lock) != 0) {
         if (s->description) {
             wasm_runtime_free(s->description);
         }
@@ -424,11 +424,11 @@ sensor_cleanup_callback(uint32 module_id)
 
     while (s) {
         sensor_client_t *c;
-        os_mutex_lock(&s->lock);
+        os_thread_mutex_lock(&s->lock);
         if ((c = find_sensor_client(s, module_id, true)) != NULL) {
             wasm_runtime_free(c);
         }
-        os_mutex_unlock(&s->lock);
+        os_thread_mutex_unlock(&s->lock);
         s = s->next;
     }
 }

@@ -21,14 +21,14 @@ bool
 module_data_list_init()
 {
     module_data_list = NULL;
-    return !os_mutex_init(&module_data_list_lock) ? true : false;
+    return !os_thread_mutex_init(&module_data_list_lock) ? true : false;
 }
 
 void
 module_data_list_destroy()
 {
 
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
     if (module_data_list) {
         while (module_data_list) {
             module_data *p = module_data_list->next;
@@ -36,15 +36,15 @@ module_data_list_destroy()
             module_data_list = p;
         }
     }
-    os_mutex_unlock(&module_data_list_lock);
-    os_mutex_destroy(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_destroy(&module_data_list_lock);
 }
 
 static void
 module_data_list_add(module_data *m_data)
 {
     static uint32 module_id_max = 1;
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
     // reserve some special ID
     // TODO: check the new id is not already occupied!
     if (module_id_max == 0xFFFFFFF0)
@@ -58,13 +58,13 @@ module_data_list_add(module_data *m_data)
         m_data->next = module_data_list;
         module_data_list = m_data;
     }
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
 }
 
 void
 module_data_list_remove(module_data *m_data)
 {
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
     if (module_data_list) {
         if (module_data_list == m_data)
             module_data_list = module_data_list->next;
@@ -78,46 +78,46 @@ module_data_list_remove(module_data *m_data)
                 p->next = p->next->next;
         }
     }
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
 }
 
 module_data *
 module_data_list_lookup(const char *module_name)
 {
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
     if (module_data_list) {
         module_data *p = module_data_list;
 
         while (p) {
             /* Search by module name */
             if (!strcmp(module_name, p->module_name)) {
-                os_mutex_unlock(&module_data_list_lock);
+                os_thread_mutex_unlock(&module_data_list_lock);
                 return p;
             }
             p = p->next;
         }
     }
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
     return NULL;
 }
 
 module_data *
 module_data_list_lookup_id(unsigned int module_id)
 {
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
     if (module_data_list) {
         module_data *p = module_data_list;
 
         while (p) {
             /* Search by module name */
             if (module_id == p->id) {
-                os_mutex_unlock(&module_data_list_lock);
+                os_thread_mutex_unlock(&module_data_list_lock);
                 return p;
             }
             p = p->next;
         }
     }
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
     return NULL;
 }
 
@@ -212,7 +212,7 @@ release_module(module_data *m_data)
 uint32
 check_modules_timer_expiry()
 {
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
     module_data *p = module_data_list;
     uint32 ms_to_expiry = (uint32)-1;
 
@@ -225,6 +225,6 @@ check_modules_timer_expiry()
 
         p = p->next;
     }
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
     return ms_to_expiry;
 }

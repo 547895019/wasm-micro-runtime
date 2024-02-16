@@ -131,11 +131,11 @@ wasm_runtime_env_init()
     }
 
 #if WASM_ENABLE_MULTI_MODULE
-    if (BHT_OK != os_mutex_init(&registered_module_list_lock)) {
+    if (BHT_OK != os_thread_mutex_init(&registered_module_list_lock)) {
         goto fail2;
     }
 
-    if (BHT_OK != os_mutex_init(&loading_module_list_lock)) {
+    if (BHT_OK != os_thread_mutex_init(&loading_module_list_lock)) {
         goto fail3;
     }
 #endif
@@ -207,9 +207,9 @@ fail5:
 fail4:
 #endif
 #if WASM_ENABLE_MULTI_MODULE
-    os_mutex_destroy(&loading_module_list_lock);
+    os_thread_mutex_destroy(&loading_module_list_lock);
 fail3:
-    os_mutex_destroy(&registered_module_list_lock);
+    os_thread_mutex_destroy(&registered_module_list_lock);
 fail2:
 #endif
     wasm_native_destroy();
@@ -265,10 +265,10 @@ wasm_runtime_destroy()
     /* runtime env destroy */
 #if WASM_ENABLE_MULTI_MODULE
     wasm_runtime_destroy_loading_module_list();
-    os_mutex_destroy(&loading_module_list_lock);
+    os_thread_mutex_destroy(&loading_module_list_lock);
 
     wasm_runtime_destroy_registered_module_list();
-    os_mutex_destroy(&registered_module_list_lock);
+    os_thread_mutex_destroy(&registered_module_list_lock);
 #endif
 
 #if WASM_ENABLE_SHARED_MEMORY
@@ -449,12 +449,12 @@ wasm_runtime_find_module_registered_by_reference(WASMModuleCommon *module)
 {
     WASMRegisteredModule *reg_module = NULL;
 
-    os_mutex_lock(&registered_module_list_lock);
+    os_thread_mutex_lock(&registered_module_list_lock);
     reg_module = bh_list_first_elem(registered_module_list);
     while (reg_module && module != reg_module->module) {
         reg_module = bh_list_elem_next(reg_module);
     }
-    os_mutex_unlock(&registered_module_list_lock);
+    os_thread_mutex_unlock(&registered_module_list_lock);
 
     return reg_module;
 }
@@ -509,11 +509,11 @@ wasm_runtime_register_module_internal(const char *module_name,
     node->orig_file_buf = orig_file_buf;
     node->orig_file_buf_size = orig_file_buf_size;
 
-    os_mutex_lock(&registered_module_list_lock);
+    os_thread_mutex_lock(&registered_module_list_lock);
     bh_list_status ret = bh_list_insert(registered_module_list, node);
     bh_assert(BH_LIST_SUCCESS == ret);
     (void)ret;
-    os_mutex_unlock(&registered_module_list_lock);
+    os_thread_mutex_unlock(&registered_module_list_lock);
     return true;
 }
 
@@ -551,7 +551,7 @@ wasm_runtime_unregister_module(const WASMModuleCommon *module)
 {
     WASMRegisteredModule *registered_module = NULL;
 
-    os_mutex_lock(&registered_module_list_lock);
+    os_thread_mutex_lock(&registered_module_list_lock);
     registered_module = bh_list_first_elem(registered_module_list);
     while (registered_module && module != registered_module->module) {
         registered_module = bh_list_elem_next(registered_module);
@@ -562,7 +562,7 @@ wasm_runtime_unregister_module(const WASMModuleCommon *module)
         bh_list_remove(registered_module_list, registered_module);
         wasm_runtime_free(registered_module);
     }
-    os_mutex_unlock(&registered_module_list_lock);
+    os_thread_mutex_unlock(&registered_module_list_lock);
 }
 
 WASMModuleCommon *
@@ -570,7 +570,7 @@ wasm_runtime_find_module_registered(const char *module_name)
 {
     WASMRegisteredModule *module = NULL, *module_next;
 
-    os_mutex_lock(&registered_module_list_lock);
+    os_thread_mutex_lock(&registered_module_list_lock);
     module = bh_list_first_elem(registered_module_list);
     while (module) {
         module_next = bh_list_elem_next(module);
@@ -579,7 +579,7 @@ wasm_runtime_find_module_registered(const char *module_name)
         }
         module = module_next;
     }
-    os_mutex_unlock(&registered_module_list_lock);
+    os_thread_mutex_unlock(&registered_module_list_lock);
 
     return module ? module->module : NULL;
 }
@@ -598,7 +598,7 @@ wasm_runtime_destroy_registered_module_list()
 {
     WASMRegisteredModule *reg_module = NULL;
 
-    os_mutex_lock(&registered_module_list_lock);
+    os_thread_mutex_lock(&registered_module_list_lock);
     reg_module = bh_list_first_elem(registered_module_list);
     while (reg_module) {
         WASMRegisteredModule *next_reg_module = bh_list_elem_next(reg_module);
@@ -628,7 +628,7 @@ wasm_runtime_destroy_registered_module_list()
         wasm_runtime_free(reg_module);
         reg_module = next_reg_module;
     }
-    os_mutex_unlock(&registered_module_list_lock);
+    os_thread_mutex_unlock(&registered_module_list_lock);
 }
 
 bool
@@ -646,11 +646,11 @@ wasm_runtime_add_loading_module(const char *module_name, char *error_buf,
     /* share the incoming string */
     loadingModule->module_name = module_name;
 
-    os_mutex_lock(&loading_module_list_lock);
+    os_thread_mutex_lock(&loading_module_list_lock);
     bh_list_status ret = bh_list_insert(loading_module_list, loadingModule);
     bh_assert(BH_LIST_SUCCESS == ret);
     (void)ret;
-    os_mutex_unlock(&loading_module_list_lock);
+    os_thread_mutex_unlock(&loading_module_list_lock);
     return true;
 }
 
@@ -661,7 +661,7 @@ wasm_runtime_delete_loading_module(const char *module_name)
 
     LoadingModule *module = NULL;
 
-    os_mutex_lock(&loading_module_list_lock);
+    os_thread_mutex_lock(&loading_module_list_lock);
     module = bh_list_first_elem(loading_module_list);
     while (module && strcmp(module->module_name, module_name)) {
         module = bh_list_elem_next(module);
@@ -672,7 +672,7 @@ wasm_runtime_delete_loading_module(const char *module_name)
         bh_list_remove(loading_module_list, module);
         wasm_runtime_free(module);
     }
-    os_mutex_unlock(&loading_module_list_lock);
+    os_thread_mutex_unlock(&loading_module_list_lock);
 }
 
 bool
@@ -682,12 +682,12 @@ wasm_runtime_is_loading_module(const char *module_name)
 
     LoadingModule *module = NULL;
 
-    os_mutex_lock(&loading_module_list_lock);
+    os_thread_mutex_lock(&loading_module_list_lock);
     module = bh_list_first_elem(loading_module_list);
     while (module && strcmp(module_name, module->module_name)) {
         module = bh_list_elem_next(module);
     }
-    os_mutex_unlock(&loading_module_list_lock);
+    os_thread_mutex_unlock(&loading_module_list_lock);
 
     return module != NULL;
 }
@@ -697,7 +697,7 @@ wasm_runtime_destroy_loading_module_list()
 {
     LoadingModule *module = NULL;
 
-    os_mutex_lock(&loading_module_list_lock);
+    os_thread_mutex_lock(&loading_module_list_lock);
     module = bh_list_first_elem(loading_module_list);
     while (module) {
         LoadingModule *next_module = bh_list_elem_next(module);
@@ -712,7 +712,7 @@ wasm_runtime_destroy_loading_module_list()
         module = next_module;
     }
 
-    os_mutex_unlock(&loading_module_list_lock);
+    os_thread_mutex_unlock(&loading_module_list_lock);
 }
 #endif /* WASM_ENABLE_MULTI_MODULE */
 
@@ -2454,7 +2454,7 @@ wasm_runtime_init_wasi(WASMModuleInstanceCommon *module_inst,
         goto fail;
     }
 
-    if (!fd_table_init(curfds)) {
+    if (!fd_table_posix_init(curfds)) {
         set_error_buf(error_buf, error_buf_size,
                       "Init wasi environment failed: "
                       "init fd table failed");
@@ -2503,7 +2503,7 @@ wasm_runtime_init_wasi(WASMModuleInstanceCommon *module_inst,
         if (!path) {
             if (error_buf)
                 snprintf(error_buf, error_buf_size,
-                         "error while pre-opening directory %s: %d\n",
+                         "realpath error while pre-opening directory %s: %d\n",
                          dir_list[i], errno);
             goto fail;
         }
@@ -2512,7 +2512,7 @@ wasm_runtime_init_wasi(WASMModuleInstanceCommon *module_inst,
         if (raw_fd == -1) {
             if (error_buf)
                 snprintf(error_buf, error_buf_size,
-                         "error while pre-opening directory %s: %d\n",
+                         "open error while pre-opening directory %s: %d\n",
                          dir_list[i], errno);
             goto fail;
         }
@@ -4257,13 +4257,13 @@ wasm_externref_equal(void *key1, void *key2)
 static bool
 wasm_externref_map_init()
 {
-    if (os_mutex_init(&externref_lock) != 0)
+    if (os_thread_mutex_init(&externref_lock) != 0)
         return false;
 
     if (!(externref_map = bh_hash_map_create(32, false, wasm_externref_hash,
                                              wasm_externref_equal, NULL,
                                              wasm_runtime_free))) {
-        os_mutex_destroy(&externref_lock);
+        os_thread_mutex_destroy(&externref_lock);
         return false;
     }
 
@@ -4275,7 +4275,7 @@ static void
 wasm_externref_map_destroy()
 {
     bh_hash_map_destroy(externref_map);
-    os_mutex_destroy(&externref_lock);
+    os_thread_mutex_destroy(&externref_lock);
 }
 
 typedef struct LookupExtObj_UserData {
@@ -4325,14 +4325,14 @@ wasm_externref_obj2ref(WASMModuleInstanceCommon *module_inst, void *extern_obj,
     lookup_user_data.node.module_inst = module_inst;
     lookup_user_data.found = false;
 
-    os_mutex_lock(&externref_lock);
+    os_thread_mutex_lock(&externref_lock);
 
     /* Lookup hashmap firstly */
     bh_hash_map_traverse(externref_map, lookup_extobj_callback,
                          (void *)&lookup_user_data);
     if (lookup_user_data.found) {
         *p_externref_idx = lookup_user_data.externref_idx;
-        os_mutex_unlock(&externref_lock);
+        os_thread_mutex_unlock(&externref_lock);
         return true;
     }
 
@@ -4358,12 +4358,12 @@ wasm_externref_obj2ref(WASMModuleInstanceCommon *module_inst, void *extern_obj,
 
     externref_global_id++;
     *p_externref_idx = externref_idx;
-    os_mutex_unlock(&externref_lock);
+    os_thread_mutex_unlock(&externref_lock);
     return true;
 fail2:
     wasm_runtime_free(node);
 fail1:
-    os_mutex_unlock(&externref_lock);
+    os_thread_mutex_unlock(&externref_lock);
     return false;
 }
 
@@ -4378,9 +4378,9 @@ wasm_externref_ref2obj(uint32 externref_idx, void **p_extern_obj)
         return true;
     }
 
-    os_mutex_lock(&externref_lock);
+    os_thread_mutex_lock(&externref_lock);
     node = bh_hash_map_find(externref_map, (void *)(uintptr_t)externref_idx);
-    os_mutex_unlock(&externref_lock);
+    os_thread_mutex_unlock(&externref_lock);
 
     if (!node)
         return false;
@@ -4484,7 +4484,7 @@ aot_mark_all_externrefs(AOTModuleInstance *module_inst)
 void
 wasm_externref_reclaim(WASMModuleInstanceCommon *module_inst)
 {
-    os_mutex_lock(&externref_lock);
+    os_thread_mutex_lock(&externref_lock);
 #if WASM_ENABLE_INTERP != 0
     if (module_inst->module_type == Wasm_Module_Bytecode)
         interp_mark_all_externrefs((WASMModuleInstance *)module_inst);
@@ -4496,7 +4496,7 @@ wasm_externref_reclaim(WASMModuleInstanceCommon *module_inst)
 
     bh_hash_map_traverse(externref_map, reclaim_extobj_callback,
                          (void *)module_inst);
-    os_mutex_unlock(&externref_lock);
+    os_thread_mutex_unlock(&externref_lock);
 }
 
 static void
@@ -4515,10 +4515,10 @@ cleanup_extobj_callback(void *key, void *value, void *user_data)
 void
 wasm_externref_cleanup(WASMModuleInstanceCommon *module_inst)
 {
-    os_mutex_lock(&externref_lock);
+    os_thread_mutex_lock(&externref_lock);
     bh_hash_map_traverse(externref_map, cleanup_extobj_callback,
                          (void *)module_inst);
-    os_mutex_unlock(&externref_lock);
+    os_thread_mutex_unlock(&externref_lock);
 }
 
 bool
@@ -4526,19 +4526,19 @@ wasm_externref_retain(uint32 externref_idx)
 {
     ExternRefMapNode *node;
 
-    os_mutex_lock(&externref_lock);
+    os_thread_mutex_lock(&externref_lock);
 
     if (externref_idx != NULL_REF) {
         node =
             bh_hash_map_find(externref_map, (void *)(uintptr_t)externref_idx);
         if (node) {
             node->retained = true;
-            os_mutex_unlock(&externref_lock);
+            os_thread_mutex_unlock(&externref_lock);
             return true;
         }
     }
 
-    os_mutex_unlock(&externref_lock);
+    os_thread_mutex_unlock(&externref_lock);
     return false;
 }
 #endif /* end of WASM_ENABLE_REF_TYPES */

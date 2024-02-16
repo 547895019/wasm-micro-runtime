@@ -67,7 +67,7 @@ wasm_runtime_memory_init(mem_alloc_type_t mem_alloc_type,
             alloc_option->allocator.realloc_func,
             alloc_option->allocator.free_func);
     else if (mem_alloc_type == Alloc_With_System_Allocator)
-        return wasm_memory_init_with_allocator(os_malloc, os_realloc, os_free);
+        return wasm_memory_init_with_allocator(os_platform_malloc, os_platform_realloc, os_platform_free);
     else
         return false;
 }

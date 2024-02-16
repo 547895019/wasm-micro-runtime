@@ -91,9 +91,9 @@ thread_sensor_check(void *arg)
         uint32 ms_to_expiry = check_sensor_timers();
         if (ms_to_expiry == UINT32_MAX)
             ms_to_expiry = 5000;
-        os_mutex_lock(&mutex);
+        os_thread_mutex_lock(&mutex);
         os_cond_reltimedwait(&cond, &mutex, ms_to_expiry * 1000);
-        os_mutex_unlock(&mutex);
+        os_thread_mutex_unlock(&mutex);
     }
 }
 
@@ -114,7 +114,7 @@ init_sensor_framework()
         return false;
     }
 
-    if (os_mutex_init(&mutex) != 0) {
+    if (os_thread_mutex_init(&mutex) != 0) {
         os_cond_destroy(&cond);
         return false;
     }

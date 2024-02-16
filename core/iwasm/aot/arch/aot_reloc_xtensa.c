@@ -8,6 +8,10 @@
 #define R_XTENSA_32 1        /* Direct 32 bit */
 #define R_XTENSA_SLOT0_OP 20 /* PC relative */
 
+#define IN_SPACE(addr, start, size) \
+    (((uintptr_t)(addr) >= (uintptr_t)(start)) && \
+     ((uintptr_t)(addr) <  ((uintptr_t)(start) + (uintptr_t)(size))))
+     
 /* clang-format off */
 /* for soft-float */
 void __floatsidf();
@@ -214,8 +218,15 @@ apply_relocation(AOTModule *module, uint8 *target_section_addr,
             }
             CHECK_RELOC_OFFSET(4);
             initial_addend = *(int32 *)insn_addr;
-            *(uintptr_t *)insn_addr = (uintptr_t)symbol_addr + initial_addend
-                                      + (intptr_t)reloc_addend;
+            
+            uintptr_t target_addr = (uintptr_t)symbol_addr + initial_addend
+                                       + (intptr_t)reloc_addend;
+
+            if (IN_SPACE(target_addr, module->code, module->code_size)) {
+                target_addr += (SOC_IROM_LOW - SOC_DROM_LOW);
+            }
+
+            *(uintptr_t *)insn_addr = target_addr;
             break;
         }
 

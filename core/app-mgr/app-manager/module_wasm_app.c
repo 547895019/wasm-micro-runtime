@@ -431,6 +431,7 @@ wasm_app_prepare_wasi_dir(wasm_module_t module, const char *module_name,
 static void *
 wasm_app_routine(void *arg)
 {
+    wasm_function_inst_t func_start = NULL;
     wasm_function_inst_t func_onInit;
     wasm_function_inst_t func_onDestroy;
 
@@ -445,7 +446,6 @@ wasm_app_routine(void *arg)
 
 #if WASM_ENABLE_LIBC_WASI != 0
     if (wasm_runtime_is_wasi_mode(inst)) {
-        wasm_function_inst_t func_start;
         /* In wasi mode, we should call function named "_start"
            which initializes the wasi envrionment. The "_start" function
            will call "main" function */
@@ -466,22 +466,24 @@ wasm_app_routine(void *arg)
     }
 #endif
 
-    /* Call app's onInit() method */
-    func_onInit = app_manager_lookup_function(inst, "_on_init", "()");
-    if (!func_onInit) {
-        app_manager_printf("Cannot find function on_init().\n");
-        goto fail1;
-    }
+    if (!func_start) {
+        /* Call app's onInit() method */
+        func_onInit = app_manager_lookup_function(inst, "_on_init", "()");
+        if (!func_onInit) {
+            app_manager_printf("Cannot find function on_init().\n");
+            goto fail1;
+        }
 
-    if (!wasm_runtime_call_wasm(wasm_app_data->exec_env, func_onInit, 0,
-                                NULL)) {
-        const char *exception = wasm_runtime_get_exception(inst);
-        bh_assert(exception);
-        app_manager_printf("Got exception running WASM code: %s\n", exception);
-        wasm_runtime_clear_exception(inst);
-        /* call on_destroy() in case some resources are opened in on_init()
-         * and then exception thrown */
-        goto fail2;
+        if (!wasm_runtime_call_wasm(wasm_app_data->exec_env, func_onInit, 0,
+                                    NULL)) {
+            const char *exception = wasm_runtime_get_exception(inst);
+            bh_assert(exception);
+            app_manager_printf("Got exception running WASM code: %s\n", exception);
+            wasm_runtime_clear_exception(inst);
+            /* call on_destroy() in case some resources are opened in on_init()
+            * and then exception thrown */
+            goto fail2;
+        }
     }
 
     /* Enter queue loop run to receive and process applet queue message */
@@ -604,6 +606,7 @@ wasm_app_module_install(request_t *msg)
     char m_name[APP_NAME_MAX_LEN] = { 0 };
     char timeout_str[MAX_INT_STR_LEN] = { 0 };
     char heap_size_str[MAX_INT_STR_LEN] = { 0 };
+    char stack_size_str[MAX_INT_STR_LEN] = { 0 };
     char timers_str[MAX_INT_STR_LEN] = { 0 }, err[128], err_resp[256];
 #if WASM_ENABLE_LIBC_WASI != 0
     char wasi_dir_buf[PATH_MAX] = { 0 };
@@ -748,6 +751,7 @@ wasm_app_module_install(request_t *msg)
             /* Load wasm module from sections */
             module = wasm_runtime_load_from_sections(bytecode_file->sections,
                                                      false, err, err_size);
+                                                     
             if (!module) {
                 snprintf(err_resp, sizeof(err_resp),
                          "Install WASM app failed: %s", err);
@@ -881,6 +885,15 @@ wasm_app_module_install(request_t *msg)
 #ifdef OS_ENABLE_HW_BOUND_CHECK
     stack_size += 4 * BH_KB;
 #endif
+    find_key_value(properties, strlen(properties), "stack", stack_size_str,
+                   sizeof(stack_size_str) - 1, '&');
+    if (strlen(stack_size_str) > 0) {
+        stack_size = atoi(stack_size_str);
+        if (stack_size < APP_THREAD_STACK_SIZE_MIN)
+            stack_size = APP_THREAD_STACK_SIZE_MIN;
+        else if (stack_size > APP_THREAD_STACK_SIZE_MAX)
+            stack_size = APP_THREAD_STACK_SIZE_MAX;
+    }
     /* Create WASM app thread. */
     if (os_thread_create(&wasm_app_data->thread_id, wasm_app_routine,
                          (void *)m_data, stack_size)
@@ -1724,6 +1737,7 @@ wasm_set_wasi_root_dir(const char *root_dir)
         return false;
 
     snprintf(wasi_root_dir, sizeof(wasi_root_dir), "%s", path);
+
     return true;
 }
 

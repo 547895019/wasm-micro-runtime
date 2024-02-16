@@ -5,6 +5,7 @@
 
 #include "app_manager.h"
 #include "app_manager_host.h"
+#include "module_wasm_app.h"
 #include "bh_platform.h"
 #include "bi-inc/attr_container.h"
 #include "event.h"
@@ -14,6 +15,21 @@
 /* Queue of app manager */
 static bh_queue *g_app_mgr_queue;
 static bool g_app_mgr_started;
+
+#define Max_Payload_Callback 1
+static resource_payload_handler_t g_payload_callbacks[Max_Payload_Callback] = {
+    0
+};
+
+#define Max_Install_Callback 1
+static resource_install_handler_t g_install_callbacks[Max_Install_Callback] = {
+    0
+};
+
+#define Max_Uninstall_Callback 1
+static resource_uninstall_handler_t g_uninstall_callbacks[Max_Uninstall_Callback] = {
+    0
+};
 
 void *
 get_app_manager_queue()
@@ -39,7 +55,7 @@ app_manager_post_applets_update_event()
         return;
     }
 
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
 
     m_data = module_data_list;
     while (m_data) {
@@ -83,7 +99,7 @@ app_manager_post_applets_update_event()
     attr_container_dump(attr_cont);
 
 fail:
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
     attr_container_destroy(attr_cont);
 }
 
@@ -93,7 +109,7 @@ get_applets_count()
     module_data *m_data;
     int num = 0;
 
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
 
     m_data = module_data_list;
     while (m_data) {
@@ -101,7 +117,7 @@ get_applets_count()
         m_data = m_data->next;
     }
 
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
 
     return num;
 }
@@ -123,7 +139,7 @@ app_manager_query_applets(request_t *msg, const char *name)
         return false;
     }
 
-    os_mutex_lock(&module_data_list_lock);
+    os_thread_mutex_lock(&module_data_list_lock);
 
     m_data = module_data_list;
     while (m_data) {
@@ -196,7 +212,7 @@ app_manager_query_applets(request_t *msg, const char *name)
     attr_container_dump(attr_cont);
 
 fail:
-    os_mutex_unlock(&module_data_list_lock);
+    os_thread_mutex_unlock(&module_data_list_lock);
     attr_container_destroy(attr_cont);
     return ret;
 }
@@ -245,6 +261,46 @@ get_module_type(char *kv_str)
 #define APP_NAME_MAX_LEN 128
 
 /* Queue callback of App Manager */
+bool
+app_manager_register_payload_callback(resource_payload_handler_t handler){
+    int i;
+
+    for (i = 0; i < Max_Payload_Callback; i++) {
+        if (g_payload_callbacks[i] == NULL) {
+            g_payload_callbacks[i] = handler;
+            return true;
+        }
+    }
+
+    return false;
+}
+bool
+app_manager_register_install_callback(resource_install_handler_t handler){
+    int i;
+
+    for (i = 0; i < Max_Install_Callback; i++) {
+        if (g_install_callbacks[i] == NULL) {
+            g_install_callbacks[i] = handler;
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool
+app_manager_register_uninstall_callback(resource_uninstall_handler_t handler){
+    int i;
+
+    for (i = 0; i < Max_Uninstall_Callback; i++) {
+        if (g_uninstall_callbacks[i] == NULL) {
+            g_uninstall_callbacks[i] = handler;
+            return true;
+        }
+    }
+
+    return false;
+}
 
 static void
 app_manager_queue_callback(void *message, void *arg)
@@ -279,10 +335,24 @@ app_manager_queue_callback(void *message, void *arg)
                                   "Install Applet failed: invalid payload.");
                 goto fail;
             }
+            
+            for (int i = 0; i < Max_Payload_Callback; i++) {
+                    if (g_payload_callbacks[i] != NULL)
+                        g_payload_callbacks[i](request);
+                    else
+                        break;
+            }
+                
             if (g_module_interfaces[module_type]
                 && g_module_interfaces[module_type]->module_install) {
                 if (!g_module_interfaces[module_type]->module_install(request))
                     goto fail;
+                for (int i = 0; i < Max_Install_Callback; i++) {
+                    if (g_install_callbacks[i] != NULL)
+                        g_install_callbacks[i](request);
+                    else
+                        break;
+                }
             }
         }
         /* Uninstall Applet */
@@ -299,6 +369,12 @@ app_manager_queue_callback(void *message, void *arg)
                 if (!g_module_interfaces[module_type]->module_uninstall(
                         request))
                     goto fail;
+                for (int i = 0; i < Max_Uninstall_Callback; i++) {
+                    if (g_uninstall_callbacks[i] != NULL)
+                        g_uninstall_callbacks[i](request);
+                    else
+                        break;
+                }
             }
         }
         /* Query Applets installed */

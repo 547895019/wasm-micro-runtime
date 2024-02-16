@@ -44,7 +44,7 @@ wasm_exec_env_create_internal(struct WASMModuleInstanceCommon *module_inst,
 #endif
 
 #if WASM_ENABLE_THREAD_MGR != 0
-    if (os_mutex_init(&exec_env->wait_lock) != 0)
+    if (os_thread_mutex_init(&exec_env->wait_lock) != 0)
         goto fail2;
 
     if (os_cond_init(&exec_env->wait_cond) != 0)
@@ -82,7 +82,7 @@ fail4:
     os_cond_destroy(&exec_env->wait_cond);
 #endif
 fail3:
-    os_mutex_destroy(&exec_env->wait_lock);
+    os_thread_mutex_destroy(&exec_env->wait_lock);
 fail2:
 #endif
 #if WASM_ENABLE_AOT != 0
@@ -97,7 +97,7 @@ void
 wasm_exec_env_destroy_internal(WASMExecEnv *exec_env)
 {
 #if WASM_ENABLE_THREAD_MGR != 0
-    os_mutex_destroy(&exec_env->wait_lock);
+    os_thread_mutex_destroy(&exec_env->wait_lock);
     os_cond_destroy(&exec_env->wait_cond);
 #if WASM_ENABLE_DEBUG_INTERP != 0
     wasm_cluster_destroy_exenv_status(exec_env->current_status);

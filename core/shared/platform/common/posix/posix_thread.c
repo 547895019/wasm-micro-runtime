@@ -104,7 +104,7 @@ os_self_thread()
 }
 
 int
-os_mutex_init(korp_mutex *mutex)
+os_thread_mutex_init(korp_mutex *mutex)
 {
     return pthread_mutex_init(mutex, NULL) == 0 ? BHT_OK : BHT_ERROR;
 }
@@ -129,7 +129,7 @@ os_recursive_mutex_init(korp_mutex *mutex)
 }
 
 int
-os_mutex_destroy(korp_mutex *mutex)
+os_thread_mutex_destroy(korp_mutex *mutex)
 {
     int ret;
 
@@ -140,7 +140,7 @@ os_mutex_destroy(korp_mutex *mutex)
 }
 
 int
-os_mutex_lock(korp_mutex *mutex)
+os_thread_mutex_lock(korp_mutex *mutex)
 {
     int ret;
 
@@ -151,7 +151,7 @@ os_mutex_lock(korp_mutex *mutex)
 }
 
 int
-os_mutex_unlock(korp_mutex *mutex)
+os_thread_mutex_unlock(korp_mutex *mutex)
 {
     int ret;
 

@@ -54,7 +54,7 @@ struct addr_pool {
 };
 
 bool
-fd_table_init(struct fd_table *);
+fd_table_posix_init(struct fd_table *);
 bool
 fd_table_insert_existing(struct fd_table *, __wasi_fd_t, int);
 bool

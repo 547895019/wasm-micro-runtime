@@ -123,7 +123,7 @@ memories_deinstantiate(WASMModuleInstance *module_inst,
                     if (ref_count > 0)
                         continue;
                 }
-                os_mutex_destroy(&memories[i]->mem_lock);
+                os_thread_mutex_destroy(&memories[i]->mem_lock);
 #endif
                 if (memories[i]->heap_handle) {
                     mem_allocator_destroy(memories[i]->heap_handle);
@@ -318,7 +318,7 @@ memory_instantiate(WASMModuleInstance *module_inst, uint32 num_bytes_per_page,
 #endif
 
 #if WASM_ENABLE_SHARED_MEMORY != 0
-    if (0 != os_mutex_init(&memory->mem_lock)) {
+    if (0 != os_thread_mutex_init(&memory->mem_lock)) {
         set_error_buf(error_buf, error_buf_size, "init mutex failed");
         goto fail4;
     }
@@ -336,7 +336,7 @@ memory_instantiate(WASMModuleInstance *module_inst, uint32 num_bytes_per_page,
     return memory;
 #if WASM_ENABLE_SHARED_MEMORY != 0
 fail5:
-    os_mutex_destroy(&memory->mem_lock);
+    os_thread_mutex_destroy(&memory->mem_lock);
 fail4:
     if (heap_size > 0)
         mem_allocator_destroy(memory->heap_handle);
@@ -1169,14 +1169,14 @@ wasm_instantiate(WASMModule *module, bool is_sub_inst, uint32 stack_size,
 
 #if WASM_ENABLE_DEBUG_INTERP != 0
     if (!is_sub_inst) {
-        os_mutex_lock(&module->ref_count_lock);
+        os_thread_mutex_lock(&module->ref_count_lock);
         if (module->ref_count != 0) {
             LOG_WARNING(
                 "warning: multiple instances referencing the same module may "
                 "cause unexpected behaviour during debugging");
         }
         module->ref_count++;
-        os_mutex_unlock(&module->ref_count_lock);
+        os_thread_mutex_unlock(&module->ref_count_lock);
     }
 #endif
 
@@ -1190,9 +1190,9 @@ wasm_instantiate(WASMModule *module, bool is_sub_inst, uint32 stack_size,
                                        error_buf_size))) {
 #if WASM_ENABLE_DEBUG_INTERP != 0
         if (!is_sub_inst) {
-            os_mutex_lock(&module->ref_count_lock);
+            os_thread_mutex_lock(&module->ref_count_lock);
             module->ref_count--;
-            os_mutex_unlock(&module->ref_count_lock);
+            os_thread_mutex_unlock(&module->ref_count_lock);
         }
 #endif
         return NULL;
@@ -1649,9 +1649,9 @@ wasm_deinstantiate(WASMModuleInstance *module_inst, bool is_sub_inst)
 
 #if WASM_ENABLE_DEBUG_INTERP != 0
     if (!is_sub_inst) {
-        os_mutex_lock(&module_inst->module->ref_count_lock);
+        os_thread_mutex_lock(&module_inst->module->ref_count_lock);
         module_inst->module->ref_count--;
-        os_mutex_unlock(&module_inst->module->ref_count_lock);
+        os_thread_mutex_unlock(&module_inst->module->ref_count_lock);
     }
 #endif
 

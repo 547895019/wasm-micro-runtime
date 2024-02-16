@@ -461,7 +461,7 @@ gc_alloc_vo_internal(void *vheap, gc_size_t size, const char *file, int line)
         return NULL;
     }
 
-    os_mutex_lock(&heap->lock);
+    os_thread_mutex_lock(&heap->lock);
 
     hmu = alloc_hmu_ex(heap, tot_size);
     if (!hmu)
@@ -487,7 +487,7 @@ gc_alloc_vo_internal(void *vheap, gc_size_t size, const char *file, int line)
         memset((uint8 *)ret + size, 0, tot_size - tot_size_unaligned);
 
 finish:
-    os_mutex_unlock(&heap->lock);
+    os_thread_mutex_unlock(&heap->lock);
     return ret;
 }
 
@@ -532,7 +532,7 @@ gc_realloc_vo_internal(void *vheap, void *ptr, gc_size_t size, const char *file,
     base_addr = heap->base_addr;
     end_addr = base_addr + heap->current_size;
 
-    os_mutex_lock(&heap->lock);
+    os_thread_mutex_lock(&heap->lock);
 
     if (hmu_old) {
         hmu_next = (hmu_t *)((char *)hmu_old + tot_size_old);
@@ -542,7 +542,7 @@ gc_realloc_vo_internal(void *vheap, void *ptr, gc_size_t size, const char *file,
             if (ut == HMU_FC && tot_size <= tot_size_old + tot_size_next) {
                 /* current node and next node meets requirement */
                 if (!unlink_hmu(heap, hmu_next)) {
-                    os_mutex_unlock(&heap->lock);
+                    os_thread_mutex_unlock(&heap->lock);
                     return NULL;
                 }
                 hmu_set_size(hmu_old, tot_size);
@@ -555,11 +555,11 @@ gc_realloc_vo_internal(void *vheap, void *ptr, gc_size_t size, const char *file,
                     hmu_next = (hmu_t *)((char *)hmu_old + tot_size);
                     tot_size_next = tot_size_old + tot_size_next - tot_size;
                     if (!gci_add_fc(heap, hmu_next, tot_size_next)) {
-                        os_mutex_unlock(&heap->lock);
+                        os_thread_mutex_unlock(&heap->lock);
                         return NULL;
                     }
                 }
-                os_mutex_unlock(&heap->lock);
+                os_thread_mutex_unlock(&heap->lock);
                 return obj_old;
             }
         }
@@ -596,7 +596,7 @@ finish:
         }
     }
 
-    os_mutex_unlock(&heap->lock);
+    os_thread_mutex_unlock(&heap->lock);
 
     if (ret && obj_old)
         gc_free_vo(vheap, obj_old);
@@ -650,7 +650,7 @@ gc_free_vo_internal(void *vheap, gc_object_t obj, const char *file, int line)
     base_addr = heap->base_addr;
     end_addr = base_addr + heap->current_size;
 
-    os_mutex_lock(&heap->lock);
+    os_thread_mutex_lock(&heap->lock);
 
     if (hmu_is_in_heap(hmu, base_addr, end_addr)) {
 #if BH_ENABLE_GC_VERIFY != 0
@@ -714,7 +714,7 @@ gc_free_vo_internal(void *vheap, gc_object_t obj, const char *file, int line)
     }
 
 out:
-    os_mutex_unlock(&heap->lock);
+    os_thread_mutex_unlock(&heap->lock);
     return ret;
 }
 

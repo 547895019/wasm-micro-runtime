@@ -7,7 +7,7 @@
 #include "platform_api_extension.h"
 
 void *
-os_malloc(unsigned size)
+os_platform_malloc(unsigned size)
 {
     void *buf_origin;
     void *buf_fixed;
@@ -29,7 +29,7 @@ os_malloc(unsigned size)
 }
 
 void *
-os_realloc(void *ptr, unsigned size)
+os_platform_realloc(void *ptr, unsigned size)
 {
     void *mem_origin;
     void *mem_new;
@@ -37,7 +37,7 @@ os_realloc(void *ptr, unsigned size)
     uintptr_t *addr_field;
 
     if (!ptr) {
-        return os_malloc(size);
+        return os_platform_malloc(size);
     }
 
     addr_field = ptr - sizeof(uintptr_t);
@@ -64,7 +64,7 @@ os_realloc(void *ptr, unsigned size)
 }
 
 void
-os_free(void *ptr)
+os_platform_free(void *ptr)
 {
     void *mem_origin;
     uintptr_t *addr_field;

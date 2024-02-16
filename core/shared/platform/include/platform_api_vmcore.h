@@ -40,13 +40,13 @@ bh_platform_destroy(void);
  */
 
 void *
-os_malloc(unsigned size);
+os_platform_malloc(unsigned size);
 
 void *
-os_realloc(void *ptr, unsigned size);
+os_platform_realloc(void *ptr, unsigned size);
 
 void
-os_free(void *ptr);
+os_platform_free(void *ptr);
 
 /**
  * Note: the above APIs can simply return NULL if wasm runtime
@@ -88,16 +88,16 @@ os_thread_get_stack_boundary(void);
  */
 
 int
-os_mutex_init(korp_mutex *mutex);
+os_thread_mutex_init(korp_mutex *mutex);
 
 int
-os_mutex_destroy(korp_mutex *mutex);
+os_thread_mutex_destroy(korp_mutex *mutex);
 
 int
-os_mutex_lock(korp_mutex *mutex);
+os_thread_mutex_lock(korp_mutex *mutex);
 
 int
-os_mutex_unlock(korp_mutex *mutex);
+os_thread_mutex_unlock(korp_mutex *mutex);
 
 /**************************************************
  *                    Section 2                   *

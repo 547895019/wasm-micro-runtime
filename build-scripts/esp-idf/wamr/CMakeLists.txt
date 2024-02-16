@@ -53,5 +53,9 @@ idf_component_register(SRCS ${WAMR_RUNTIME_LIB_SOURCE} ${PLATFORM_SHARED_SOURCE}
   INCLUDE_DIRS ${IWASM_DIR}/include ${UTILS_SHARED_DIR} ${PLATFORM_SHARED_DIR} ${PLATFORM_SHARED_DIR}/../include
   REQUIRES pthread
 )
-
+set_source_files_properties(
+    ${WAMR_ROOT_DIR}/core/iwasm/aot/arch/aot_reloc_xtensa.c
+    PROPERTIES COMPILE_FLAGS
+    -Wno-address-of-packed-member
+)
 

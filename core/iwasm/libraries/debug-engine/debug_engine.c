@@ -27,7 +27,7 @@ typedef struct WASMDebugEngine {
 void
 on_thread_stop_event(WASMDebugInstance *debug_inst, WASMExecEnv *exec_env)
 {
-    os_mutex_lock(&debug_inst->wait_lock);
+    os_thread_mutex_lock(&debug_inst->wait_lock);
     debug_inst->stopped_thread = exec_env;
 
     if (debug_inst->current_state == DBG_LAUNCHING) {
@@ -35,7 +35,7 @@ on_thread_stop_event(WASMDebugInstance *debug_inst, WASMExecEnv *exec_env)
          * can be woken up */
         os_cond_signal(&debug_inst->wait_cond);
     }
-    os_mutex_unlock(&debug_inst->wait_lock);
+    os_thread_mutex_unlock(&debug_inst->wait_lock);
 }
 
 static WASMDebugEngine *g_debug_engine;
@@ -49,9 +49,9 @@ allocate_instance_id()
 
     bh_assert(g_debug_engine);
 
-    os_mutex_lock(&g_debug_engine->instance_list_lock);
+    os_thread_mutex_lock(&g_debug_engine->instance_list_lock);
     id = current_instance_id++;
-    os_mutex_unlock(&g_debug_engine->instance_list_lock);
+    os_thread_mutex_unlock(&g_debug_engine->instance_list_lock);
 
     return id;
 }
@@ -71,7 +71,7 @@ control_thread_routine(void *arg)
     control_thread = debug_inst->control_thread;
     bh_assert(control_thread);
 
-    os_mutex_lock(&debug_inst->wait_lock);
+    os_thread_mutex_lock(&debug_inst->wait_lock);
 
     control_thread->status = RUNNING;
 
@@ -94,7 +94,7 @@ control_thread_routine(void *arg)
     if (!control_thread->server) {
         LOG_ERROR("Failed to create debug server\n");
         os_cond_signal(&debug_inst->wait_cond);
-        os_mutex_unlock(&debug_inst->wait_lock);
+        os_thread_mutex_unlock(&debug_inst->wait_lock);
         return NULL;
     }
 
@@ -106,7 +106,7 @@ control_thread_routine(void *arg)
      *  so we wake up the execution thread before listen
      */
     os_cond_signal(&debug_inst->wait_cond);
-    os_mutex_unlock(&debug_inst->wait_lock);
+    os_thread_mutex_unlock(&debug_inst->wait_lock);
 
     /* wait lldb client to connect */
     if (!wasm_gdbserver_listen(control_thread->server)) {
@@ -116,7 +116,7 @@ control_thread_routine(void *arg)
     }
 
     while (true) {
-        os_mutex_lock(&control_thread->wait_lock);
+        os_thread_mutex_lock(&control_thread->wait_lock);
         if (!should_stop(control_thread)) {
             /* send thread stop reply */
             if (debug_inst->stopped_thread
@@ -142,7 +142,7 @@ control_thread_routine(void *arg)
                         debug_inst->stopped_thread = NULL;
                         /* The exiting thread may wait for the signal */
                         os_cond_signal(&debug_inst->wait_cond);
-                        os_mutex_unlock(&control_thread->wait_lock);
+                        os_thread_mutex_unlock(&control_thread->wait_lock);
                         continue;
                     }
                 }
@@ -167,10 +167,10 @@ control_thread_routine(void *arg)
             }
         }
         else {
-            os_mutex_unlock(&control_thread->wait_lock);
+            os_thread_mutex_unlock(&control_thread->wait_lock);
             break;
         }
-        os_mutex_unlock(&control_thread->wait_lock);
+        os_thread_mutex_unlock(&control_thread->wait_lock);
     }
 
     LOG_VERBOSE("control thread of debug object [%p] stopped\n", debug_inst);
@@ -189,39 +189,39 @@ wasm_debug_control_thread_create(WASMDebugInstance *debug_instance)
     }
     memset(control_thread, 0, sizeof(WASMDebugControlThread));
 
-    if (os_mutex_init(&control_thread->wait_lock) != 0)
+    if (os_thread_mutex_init(&control_thread->wait_lock) != 0)
         goto fail;
 
     debug_instance->control_thread = control_thread;
 
-    os_mutex_lock(&debug_instance->wait_lock);
+    os_thread_mutex_lock(&debug_instance->wait_lock);
 
     if (0
         != os_thread_create(&control_thread->tid, control_thread_routine,
                             debug_instance, APP_THREAD_STACK_SIZE_MAX)) {
-        os_mutex_unlock(&debug_instance->wait_lock);
+        os_thread_mutex_unlock(&debug_instance->wait_lock);
         goto fail1;
     }
 
     /* wait until the debug control thread ready */
     os_cond_wait(&debug_instance->wait_cond, &debug_instance->wait_lock);
-    os_mutex_unlock(&debug_instance->wait_lock);
+    os_thread_mutex_unlock(&debug_instance->wait_lock);
     if (!control_thread->server) {
         os_thread_join(control_thread->tid, NULL);
         goto fail1;
     }
 
-    os_mutex_lock(&g_debug_engine->instance_list_lock);
+    os_thread_mutex_lock(&g_debug_engine->instance_list_lock);
     /* create control thread success, append debug instance to debug engine */
     bh_list_insert(&g_debug_engine->debug_instance_list, debug_instance);
-    os_mutex_unlock(&g_debug_engine->instance_list_lock);
+    os_thread_mutex_unlock(&g_debug_engine->instance_list_lock);
 
     wasm_cluster_send_signal_all(debug_instance->cluster, WAMR_SIG_STOP);
 
     return control_thread;
 
 fail1:
-    os_mutex_destroy(&control_thread->wait_lock);
+    os_thread_mutex_destroy(&control_thread->wait_lock);
 fail:
     wasm_runtime_free(control_thread);
     return NULL;
@@ -235,13 +235,13 @@ wasm_debug_control_thread_destroy(WASMDebugInstance *debug_instance)
     LOG_VERBOSE("stopping control thread of debug object [%p]\n",
                 debug_instance);
     control_thread->status = STOPPED;
-    os_mutex_lock(&control_thread->wait_lock);
+    os_thread_mutex_lock(&control_thread->wait_lock);
     wasm_close_gdbserver(control_thread->server);
-    os_mutex_unlock(&control_thread->wait_lock);
+    os_thread_mutex_unlock(&control_thread->wait_lock);
     os_thread_join(control_thread->tid, NULL);
     wasm_runtime_free(control_thread->server);
 
-    os_mutex_destroy(&control_thread->wait_lock);
+    os_thread_mutex_destroy(&control_thread->wait_lock);
     wasm_runtime_free(control_thread);
 }
 
@@ -256,7 +256,7 @@ wasm_debug_engine_create()
     }
     memset(engine, 0, sizeof(WASMDebugEngine));
 
-    if (os_mutex_init(&engine->instance_list_lock) != 0) {
+    if (os_thread_mutex_init(&engine->instance_list_lock) != 0) {
         wasm_runtime_free(engine);
         LOG_ERROR("WASM Debug Engine error: failed to init mutex");
         return NULL;
@@ -284,7 +284,7 @@ wasm_debug_engine_destroy()
 {
     if (g_debug_engine) {
         wasm_debug_handler_deinit();
-        os_mutex_destroy(&g_debug_engine->instance_list_lock);
+        os_thread_mutex_destroy(&g_debug_engine->instance_list_lock);
         wasm_runtime_free(g_debug_engine);
         g_debug_engine = NULL;
     }
@@ -358,7 +358,7 @@ wasm_debug_instance_create(WASMCluster *cluster)
     }
     memset(instance, 0, sizeof(WASMDebugInstance));
 
-    if (os_mutex_init(&instance->wait_lock) != 0) {
+    if (os_thread_mutex_init(&instance->wait_lock) != 0) {
         goto fail1;
     }
 
@@ -404,7 +404,7 @@ wasm_debug_instance_create(WASMCluster *cluster)
 fail3:
     os_cond_destroy(&instance->wait_cond);
 fail2:
-    os_mutex_destroy(&instance->wait_lock);
+    os_thread_mutex_destroy(&instance->wait_lock);
 fail1:
     wasm_runtime_free(instance);
 
@@ -441,14 +441,14 @@ wasm_debug_instance_destroy(WASMCluster *cluster)
         /* destroy control thread */
         wasm_debug_control_thread_destroy(instance);
 
-        os_mutex_lock(&g_debug_engine->instance_list_lock);
+        os_thread_mutex_lock(&g_debug_engine->instance_list_lock);
         bh_list_remove(&g_debug_engine->debug_instance_list, instance);
-        os_mutex_unlock(&g_debug_engine->instance_list_lock);
+        os_thread_mutex_unlock(&g_debug_engine->instance_list_lock);
 
         /* destroy all breakpoints */
         wasm_debug_instance_destroy_breakpoints(instance);
 
-        os_mutex_destroy(&instance->wait_lock);
+        os_thread_mutex_destroy(&instance->wait_lock);
         os_cond_destroy(&instance->wait_cond);
 
         wasm_runtime_free(instance);
@@ -834,7 +834,7 @@ wasm_exec_env_get_instance(WASMExecEnv *exec_env)
         return NULL;
     }
 
-    os_mutex_lock(&g_debug_engine->instance_list_lock);
+    os_thread_mutex_lock(&g_debug_engine->instance_list_lock);
     instance = bh_list_first_elem(&g_debug_engine->debug_instance_list);
     while (instance) {
         if (instance->cluster == exec_env->cluster)
@@ -842,7 +842,7 @@ wasm_exec_env_get_instance(WASMExecEnv *exec_env)
         instance = bh_list_elem_next(instance);
     }
 
-    os_mutex_unlock(&g_debug_engine->instance_list_lock);
+    os_thread_mutex_unlock(&g_debug_engine->instance_list_lock);
     return instance;
 }
 
@@ -1032,10 +1032,10 @@ wasm_debug_instance_kill(WASMDebugInstance *instance)
         wasm_cluster_thread_send_signal(exec_env, WAMR_SIG_TERM);
         if (instance->current_state == APP_STOPPED) {
             /* Resume all threads so they can receive the TERM signal */
-            os_mutex_lock(&exec_env->wait_lock);
+            os_thread_mutex_lock(&exec_env->wait_lock);
             exec_env->current_status->running_status = STATUS_RUNNING;
             os_cond_signal(&exec_env->wait_cond);
-            os_mutex_unlock(&exec_env->wait_lock);
+            os_thread_mutex_unlock(&exec_env->wait_lock);
         }
         exec_env = bh_list_elem_next(exec_env);
     }

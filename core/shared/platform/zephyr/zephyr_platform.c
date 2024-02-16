@@ -70,19 +70,19 @@ bh_platform_destroy()
 }
 
 void *
-os_malloc(unsigned size)
+os_platform_malloc(unsigned size)
 {
     return NULL;
 }
 
 void *
-os_realloc(void *ptr, unsigned size)
+os_platform_realloc(void *ptr, unsigned size)
 {
     return NULL;
 }
 
 void
-os_free(void *ptr)
+os_platform_free(void *ptr)
 {}
 
 #if 0

@@ -1579,7 +1579,7 @@ load_function_section(const uint8 *buf, const uint8 *buf_end, AOTModule *module,
                           "invalid function code offset");
             return false;
         }
-        module->func_ptrs[i] = (uint8 *)module->code + text_offset;
+        module->func_ptrs[i] = (uint8 *)module->code + text_offset + (SOC_IROM_LOW - SOC_DROM_LOW);
 #if defined(BUILD_TARGET_THUMB) || defined(BUILD_TARGET_THUMB_VFP)
         /* bits[0] of thumb function address must be 1 */
         module->func_ptrs[i] = (void *)((uintptr_t)module->func_ptrs[i] | 1);
