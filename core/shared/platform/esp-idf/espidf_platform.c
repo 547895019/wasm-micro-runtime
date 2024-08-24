@@ -217,27 +217,42 @@ unlinkat(int fd, const char *path, int flag)
     return -1;
 }
 
+#if __NEWLIB__ >= 4 && __NEWLIB_MINOR__ >= 3
+int
+utimensat(int fd, const char *path, const struct timespec ts[2], int flag)
+{
+    errno = ENOSYS;
+    return -1;
+}
+#else
 int
 utimensat(int fd, const char *path, const struct timespec *ts, int flag)
 {
     errno = ENOSYS;
     return -1;
-}
-
+}    
+#endif
 DIR *
 fdopendir(int fd)
 {
     errno = ENOSYS;
     return NULL;
 }
-
+#if __NEWLIB__ >= 4 && __NEWLIB_MINOR__ >= 3
+int
+futimens(int fd, const struct timespec times[2])
+{
+    errno = ENOSYS;
+    return -1;
+}
+#else
 int
 futimens(int fd, const struct timespec *times)
 {
     errno = ENOSYS;
     return -1;
-}
-
+}    
+#endif
 int
 nanosleep(const struct timespec *req, struct timespec *rem)
 {
